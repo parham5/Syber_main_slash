@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+    (function() {
+      const savedTheme = localStorage.getItem('userTheme');
+      const savedBg = localStorage.getItem('userBackground');
+      if (savedTheme) document.body.classList.add(savedTheme);
+      if (savedBg) {
+        document.body.style.backgroundImage = savedBg;
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundAttachment = 'fixed';
+      }
+    })();
+  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Post - Cybers/ash</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./index.css">
+  <style>
+    .reply-input-area {
+      background: var(--theme-bg-secondary);
+      border: 1px solid var(--theme-border);
+      border-radius: 20px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .reply-input-area textarea {
+      width: 100%;
+      background: var(--theme-bg-tertiary);
+      border: 1px solid var(--theme-border);
+      border-radius: 15px;
+      padding: 12px;
+      color: var(--theme-text-primary);
+      font-family: inherit;
+      resize: vertical;
+      margin-bottom: 10px;
+      font-size: 15px;
+    }
+    .reply-input-area textarea:focus {
+      outline: none;
+      border-color: var(--theme-accent);
+    }
+    .reply-submit-btn {
+      background: var(--theme-accent);
+      color: white;
+      border: none;
+      padding: 8px 24px;
+      border-radius: 25px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    .reply-submit-btn:hover {
+      opacity: 0.9;
+    }
+    .reply-submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .post-view-header {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid var(--theme-border);
+    }
+    .back-button {
+      background: none;
+      border: none;
+      color: var(--theme-accent);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .back-button:hover {
+      opacity: 0.8;
+    }
+    .replies-header {
+      margin-top: 30px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--theme-border);
+    }
+    .replies-header h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--theme-text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="post-view-header">
+      <button onclick="goBack()" class="back-button">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+        Back
+      </button>
+      <h2 style="margin: 0;">Post</h2>
+    </div>
+    
+    <div id="postContainer" class="loading">Loading post...</div>
+    
+    <!-- Reply Input Area -->
+    <div class="reply-input-area" id="replyInputArea" style="display: none;">
+      <textarea id="replyTextarea" rows="3" placeholder="Post your reply..."></textarea>
+      <div style="display: flex; justify-content: flex-end;">
+        <button class="reply-submit-btn" onclick="submitReply()">Reply</button>
+      </div>
+    </div>
+    
+    <!-- Replies Section -->
+    <div id="repliesSection" style="display: none;">
+      <div class="replies-header">
+        <h3>Replies</h3>
+      </div>
+      <div id="repliesList"></div>
+    </div>
+  </div>
+  
+  <script src="./index.js"></script>
+  <script>
+    let currentPostId = null;
+    let currentPostData = null;
+    let csrfTokenValue = null;
+    
+    function goBack() {
+      window.history.back();
+    }
+    
+    // Get CSRF token
+    async function getCsrfToken() {
+      try {
+        const response = await fetch('/csrf-token', { credentials: 'include' });
+        const data = await response.json();
+        csrfTokenValue = data.csrfToken;
+        return csrfTokenValue;
+      } catch (err) {
+        console.error('Failed to get CSRF token:', err);
+        return null;
+      }
+    }
+    
+    // Custom fetch with CSRF for this page
+    async function postWithCsrf(url, formData) {
+      if (!csrfTokenValue) {
+        await getCsrfToken();
+      }
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'X-CSRF-Token': csrfTokenValue
+        },
+        credentials: 'include',
+        body: formData
+      });
+      return response;
+    }
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const postId = urlParams.get('id');
+    
+    if (postId) {
+      currentPostId = postId;
+      loadSinglePost(postId);
+      loadRepliesForPost(postId);
+      getCsrfToken();
+    }
+    
+    async function loadSinglePost(postId) {
+      try {
+        const response = await fetch('/api/messages', { credentials: 'include' });
+        const posts = await response.json();
+        const post = posts.find(p => p.id == postId);
+        
+        if (post) {
+          currentPostData = post;
+          const container = document.getElementById('postContainer');
+          container.innerHTML = '';
+          const postElement = createPostElement(post, true);
+          container.appendChild(postElement);
+          document.title = `Post by ${post.username} - Cybers/ash`;
+          
+          // Show reply input area made into a working version with csurf protection.
+          document.getElementById('replyInputArea').style.display = 'block';
+        } else {
+          document.getElementById('postContainer').innerHTML = '<p style="color: var(--theme-text-secondary); text-align: center; padding: 40px;">Post not found or has been deleted.</p>';
+        }
+      } catch (err) {
+        console.error('Failed to load post:', err);
+        document.getElementById('postContainer').innerHTML = '<p style="color: var(--theme-text-secondary); text-align: center; padding: 40px;">Error loading post.</p>';
+      }
+    }
+    
+    async function loadRepliesForPost(postId) {
+      try {
+        const response = await fetch(`/api/messages/${postId}/replies`, { credentials: 'include' });
+        const replies = await response.json();
+        const container = document.getElementById('repliesList');
+        const repliesSection = document.getElementById('repliesSection');
+        
+        if (!replies || replies.length === 0) {
+          container.innerHTML = '<p style="color: var(--theme-text-secondary); text-align: center; padding: 20px;">No replies yet. Be the first to reply!</p>';
+          repliesSection.style.display = 'block';
+          return;
+        }
+        
+        repliesSection.style.display = 'block';
+        container.innerHTML = '';
+        
+        // Sort replies by timestamp (oldest first for thread view)
+        replies.sort((a, b) => a.timestamp - b.timestamp);
+        
+        replies.forEach(reply => {
+          const replyElement = createPostElement(reply, false);
+          container.appendChild(replyElement);
+        });
+      } catch (err) {
+        console.error('Failed to load replies:', err);
+        document.getElementById('repliesList').innerHTML = '<p style="color: var(--theme-text-secondary); text-align: center; padding: 20px;">Error loading replies.</p>';
+        document.getElementById('repliesSection').style.display = 'block';
+      }
+    }
+    
+    async function submitReply() {
+      const replyText = document.getElementById('replyTextarea').value.trim();
+      if (!replyText) {
+        alert('Please enter a reply');
+        return;
+      }
+      
+      const submitBtn = document.querySelector('.reply-submit-btn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Posting...';
+      
+      const formData = new FormData();
+      formData.append('message', replyText);
+      formData.append('parentId', currentPostId);
+      
+      try {
+        const response = await postWithCsrf('/api/messages', formData);
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to post reply');
+        }
+        
+        // Clear textarea
+        document.getElementById('replyTextarea').value = '';
+        
+        // Reload replies
+        await loadRepliesForPost(currentPostId);
+        
+        // Update reply count on the original post in the UI
+        const replyCountSpan = document.querySelector('#postContainer .action-count');
+        if (replyCountSpan) {
+          const currentCount = parseInt(replyCountSpan.textContent) || 0;
+          replyCountSpan.textContent = currentCount + 1;
+        }
+        
+        // Also update the reply count in the global allPosts if needed
+        if (currentPostData) {
+          currentPostData.replyCount = (currentPostData.replyCount || 0) + 1;
+        }
+        
+      } catch (err) {
+        console.error('Error posting reply:', err);
+        alert(err.message || 'Failed to post reply. Please try again.');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Reply';
+      }
+    }
+  </script>
+</body>
+</html>

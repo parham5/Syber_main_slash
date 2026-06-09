@@ -1,0 +1,1634 @@
+// Updated server.js - "Smart Path" Fix
+const express = require("express");
+const app = express();
+const fs = require("fs");
+const multer = require("multer");
+const cors = require("cors");
+const path = require("path");
+const bcrypt = require("bcrypt");
+const session = require("express-session");
+const rateLimit = require("express-rate-limit");
+const sanitizeHtml = require("sanitize-html");
+const csurf = require("csurf");
+
+// ==========================================
+// 1. SECURITY & LOGGING SETUP
+// ==========================================
+
+const honeypotBlockedIPs = new Set();
+const permanentBlockedIPs = new Set();
+const temporaryBlockedIPs = new Set();
+const whitelistedIPs = ["151.238.130.92"];
+
+app.set('trust proxy', 1);
+
+app.get("/admin-panel", (req, res) => {
+  const ip = req.ip;
+  const userAgent = req.get("User-Agent") || "Unknown";
+  const time = new Date().toISOString();
+  const logEntry = { ip, userAgent, time, path: req.originalUrl };
+  fs.appendFileSync("honeypot_logs.txt", JSON.stringify(logEntry) + "\n");
+  honeypotBlockedIPs.add(ip);
+  res.status(403).send("Access Denied (Honeypot Triggered)");
+});
+
+app.get("/server.js", (req, res) => {
+  const ip = req.ip;
+  const userAgent = req.get("User-Agent") || "Unknown";
+  const time = new Date().toISOString();
+  const logEntry = { ip, userAgent, time, path: req.originalUrl };
+  fs.appendFileSync("honeypot_logs.txt", JSON.stringify(logEntry) + "\n");
+  
+  // Redirect to index.html instead of blocking
+  res.redirect("/index.html");
+});
+
+app.get("/storage/users.json", (req, res) => {
+  const ip = req.ip;
+  const userAgent = req.get("User-Agent") || "Unknown";
+  const time = new Date().toISOString();
+  const logEntry = { ip, userAgent, time, path: req.originalUrl };
+  fs.appendFileSync("honeypot_logs.txt", JSON.stringify(logEntry) + "\n");
+  
+  // Redirect to index.html instead of blocking
+  res.redirect("/index.html");
+});
+
+app.get("/storage/directs.json", (req, res) => {
+  const ip = req.ip;
+  const userAgent = req.get("User-Agent") || "Unknown";
+  const time = new Date().toISOString();
+  const logEntry = { ip, userAgent, time, path: req.originalUrl };
+  fs.appendFileSync("honeypot_logs.txt", JSON.stringify(logEntry) + "\n");
+  
+  // Redirect to index.html instead of blocking
+  res.redirect("/index.html");
+});
+
+app.get("/storage/messages.json", (req, res) => {
+  const ip = req.ip;
+  const userAgent = req.get("User-Agent") || "Unknown";
+  const time = new Date().toISOString();
+  const logEntry = { ip, userAgent, time, path: req.originalUrl };
+  fs.appendFileSync("honeypot_logs.txt", JSON.stringify(logEntry) + "\n");
+  
+  // Redirect to index.html instead of blocking
+  res.redirect("/index.html");
+});
+
+app.use((req, res, next) => {
+  if (permanentBlockedIPs.has(req.ip) || honeypotBlockedIPs.has(req.ip)) {
+    return res.status(403).send("Access Denied (Permanently Blocked)");
+  }
+  next();
+});
+
+// ==========================================
+// 2. THE FIX: SMART ROOT HANDLER
+// ==========================================
+
+app.get("/", (req, res) => {
+  // Option A: Look in the root folder (same as server.js)
+  const rootPath = path.join(__dirname, "index.html");
+  // Option B: Look in the 'public' folder
+  const publicPath = path.join(__dirname, "public", "index.html");
+
+  if (fs.existsSync(rootPath)) {
+    res.sendFile(rootPath);
+  } else if (fs.existsSync(publicPath)) {
+    res.sendFile(publicPath);
+  } else {
+    // If we can't find it, we explain why directly in the browser
+    console.error(`[ERROR] index.html not found in ${rootPath} OR ${publicPath}`);
+    res.status(404).send("Server Error: index.html not found. Please check your file structure.");
+  }
+});
+
+// ==========================================
+// 3. MIDDLEWARE & STATIC FILES
+// ==========================================
+
+app.use(cors());
+app.use(express.json());
+
+// Add near the top of server.js
+app.use((req, res, next) => {
+    const userAgent = req.get('User-Agent') || '';
+    const isBlackBerry = /BlackBerry|BB10|RIM|PlayBook/i.test(userAgent);
+    
+    if (isBlackBerry) {
+        // Force simpler JavaScript for BlackBerry
+        const originalSend = res.send;
+        res.send = function(body) {
+            if (typeof body === 'string' && body.includes('</head>')) {
+                // Add BlackBerry compatibility
+                body = body.replace('</head>', 
+                    '<meta name="HandheldFriendly" content="true">' +
+                    '<meta name="viewport" content="width=320, initial-scale=1.0, user-scalable=no">' +
+                    '<script>' +
+                    '// BlackBerry compatibility' +
+                    'if (typeof window.addEventListener === "undefined") {' +
+                    '    window.addEventListener = function(event, func) {' +
+                    '        this.attachEvent("on" + event, func);' +
+                    '    };' +
+                    '}' +
+                    '// Fix for ES6 features BlackBerry doesn\'t support' +
+                    'if (typeof Promise === "undefined") {' +
+                    '    window.Promise = { resolve: function() {}, reject: function() {} };' +
+                    '}' +
+                    '</script>' +
+                    '<style>' +
+                    '/* Force simple styles for BlackBerry */' +
+                    'body { -webkit-text-size-adjust: 100%; }' +
+                    'button, input { min-height: 32px; }' +
+                    '</style>' +
+                    '</head>');
+            }
+            originalSend.call(this, body);
+        };
+    }
+    next();
+});
+
+// Add this middleware near the top of server.js (after CORS)
+app.use((req, res, next) => {
+    // Allow embedding in BrowserField
+    res.removeHeader('X-Frame-Options');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    
+    // Handle preflight
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
+    next();
+});
+
+// Disable 'index' here so it doesn't fight with our smart route above
+app.use(express.static(__dirname, { index: false })); 
+app.use(express.static(path.join(__dirname, "public"), { index: false }));
+app.use('/uploads', express.static(path.join(__dirname, 'storage', 'uploads')));
+app.use('/pfps', express.static(path.join(__dirname, 'storage', 'pfps')));
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || require('crypto').randomBytes(64).toString('hex'),
+  resave: false,
+  saveUninitialized: false,
+  cookie: { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" }
+}));
+
+// ==========================================
+// 4. CSRF PROTECTION - AFTER SESSION MIDDLEWARE
+// ==========================================
+// This MUST come after session middleware
+app.use(csurf());
+
+// ==========================================
+// 5. RATE LIMITING
+// ==========================================
+
+const BLOCK_THRESHOLD = 3;
+const rateLimitHitCounts = new Map();
+
+const limiter = rateLimit({
+  windowMs: 5 * 60 * 1000, 
+  max: 10,
+  message: "Too many requests, please try again after 5 minutes.",
+  handler: (req, res) => {
+    const ip = req.ip;
+    temporaryBlockedIPs.add(ip);
+    const currentHits = rateLimitHitCounts.get(ip) || 0;
+    rateLimitHitCounts.set(ip, currentHits + 1);
+    if (currentHits + 1 >= BLOCK_THRESHOLD) {
+      permanentBlockedIPs.add(ip);
+      rateLimitHitCounts.delete(ip);
+      console.warn(`IP ${ip} permanently blocked.`);
+    }
+    res.status(429).send("Too Many Requests");
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: rateLimit.ipKeyGenerator,
+});
+
+app.use((req, res, next) => {
+  if (whitelistedIPs.includes(req.ip)) return next();
+  if (temporaryBlockedIPs.has(req.ip)) return res.status(429).send("Too Many Requests");
+  limiter(req, res, next);
+});
+
+// Simple BlackBerry middleware - NO errors
+app.use(function(req, res, next) {
+  try {
+    var userAgent = req.get('User-Agent') || '';
+    if (/BlackBerry|BB10|RIM|PlayBook/i.test(userAgent)) {
+      // Simple header for BlackBerry
+      res.setHeader('X-BlackBerry-Optimized', 'true');
+    }
+  } catch (e) {
+    // Don't break if middleware fails
+  }
+  next();
+});
+
+// ==========================================
+// 6. FILE UPLOAD CONFIG
+// ==========================================
+
+const DATA_FILE = "storage/messages.json";
+const USERS_FILE = "storage/users.json";
+const UPLOAD_DIR = "storage/uploads";
+const PFP_DIR = "storage/pfps";
+
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR);
+if (!fs.existsSync(PFP_DIR)) fs.mkdirSync(PFP_DIR);
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const isPfp = req.originalUrl.includes("/upload-pfp");
+    cb(null, isPfp ? PFP_DIR : UPLOAD_DIR);
+  },
+  filename: (req, file, cb) => {
+    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, unique + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const blocked = ["application/x-msdownload", "application/x-msi", "application/octet-stream"];
+    const extBlocked = [".exe", ".msi", ".dmg", ".pkg", ".deb", ".apk", ".jar"];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (blocked.includes(file.mimetype) || extBlocked.includes(ext)) {
+      cb(new Error("File type not allowed"));
+    } else {
+      cb(null, true);
+    }
+  },
+  limits: { fileSize: 15 * 1024 * 1024 }
+});
+
+// ==========================================
+// 7. API ROUTES
+// ==========================================
+
+app.get("/csrf-token", (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
+
+app.post("/signup", (req, res) => {
+  const users = loadUsers();
+  const userCount = Object.keys(users).filter(u => u.startsWith("/user_")).length + 1;
+  const newUsername = `/user_${userCount}`; 
+  const { password } = req.body;
+  
+  if (!password || !isPasswordSecure(password)) {
+    return res.status(400).json({ error: "Password requirement failed" });
+  }
+  
+  users[newUsername] = { 
+    password: bcrypt.hashSync(password, 10), 
+    pfp: null,
+    about: "New user"
+  };
+  
+  saveUsers(users);
+  req.session.username = newUsername;
+  
+  res.json({ 
+    username: newUsername,
+    message: `Your username is: ${newUsername}. Save this to login later!`
+  });
+});
+
+app.post("/login", (req, res) => {
+  const users = loadUsers();
+  const { username, password } = req.body;
+  const user = users[username];
+  if (!user || !bcrypt.compareSync(password, user.password)) return res.status(401).json({ error: "Invalid credentials" });
+  req.session.regenerate((err) => {
+    if (err) return res.status(500).json({ error: "Session error" });
+    req.session.username = username;
+    res.json({ username });
+  });
+});
+
+app.post("/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.clearCookie("connect.sid");
+    res.json({ message: "Logged out" });
+  });
+});
+
+app.get("/session", (req, res) => {
+  if (req.session.username) {
+    const users = loadUsers();
+    res.json({ username: req.session.username, pfp: users[req.session.username]?.pfp });
+  } else {
+    res.status(401).json({ error: "Not signed in" });
+  }
+});
+
+app.post("/upload-pfp", upload.single("pfp"), (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  if (!req.file) return res.status(400).json({ error: "Upload failed" });
+  
+  const users = loadUsers();
+  const username = req.session.username;
+  
+  // 1. Update the User's profile in users.json
+  const newPfpPath = `storage/pfps/${req.file.filename}`;
+  users[username].pfp = newPfpPath;
+  saveUsers(users);
+
+  // 2. CRITICAL FIX: Update ALL old messages to use the new PFP
+  const messages = loadMessages();
+  let updatedCount = 0;
+  
+  messages.forEach(msg => {
+    // If this message was written by the user, update their PFP
+    if (msg.username === username) {
+      msg.pfp = newPfpPath;
+      updatedCount++;
+    }
+  });
+  
+  // Save the updated messages back to the file
+  saveMessages(messages);
+  
+  console.log(`[PFP Update] Updated ${updatedCount} messages for user ${username}`);
+
+  res.json({ pfp: newPfpPath });
+});
+
+app.post("/api/messages", upload.single("image"), (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const users = loadUsers();
+  const newMsg = {
+    id: Date.now(),
+    username: req.session.username,
+    message: sanitizeHtml(req.body.message, { allowedTags: [], allowedAttributes: {} }),
+    timestamp: Date.now(),
+    imageUrl: req.file ? `storage/uploads/${req.file.filename}` : null,
+    pfp: users[req.session.username]?.pfp || null,
+    parentId: req.body.parentId ? parseInt(req.body.parentId, 10) : null,
+    likes: [], saves: [], retweets: []
+  };
+  const messages = loadMessages();
+  messages.push(newMsg);
+  saveMessages(messages);
+  res.json(newMsg);
+});
+
+app.get("/api/messages", (req, res) => {
+  const messages = loadMessages();
+  messages.forEach(msg => { if(!msg.saves) msg.saves = []; if(!msg.likes) msg.likes = []; });
+  res.json(messages.filter(msg => !msg.parentId));
+});
+
+app.get("/api/messages/:id", (req, res) => {
+  const msg = loadMessages().find(m => m.id === parseInt(req.params.id, 10));
+  if (!msg) return res.status(404).json({ error: "Post not found" });
+  if(!msg.saves) msg.saves = []; if(!msg.likes) msg.likes = [];
+  res.json(msg);
+});
+
+app.get("/api/messages/:id/replies", (req, res) => {
+  const replies = loadMessages().filter(m => m.parentId === parseInt(req.params.id, 10));
+  replies.forEach(msg => { if(!msg.saves) msg.saves = []; if(!msg.likes) msg.likes = []; });
+  res.json(replies);
+});
+
+app.delete("/api/messages/:id", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const messages = loadMessages();
+  const index = messages.findIndex(msg => msg.id === parseInt(req.params.id, 10));
+  if (index === -1) return res.status(404).json({ error: "Post not found" });
+  if (messages[index].username !== req.session.username) return res.status(403).json({ error: "Forbidden" });
+  
+  if (messages[index].imageUrl) {
+    const fp = path.join(UPLOAD_DIR, path.basename(messages[index].imageUrl));
+    if (fs.existsSync(fp)) fs.unlinkSync(fp);
+  }
+  messages.splice(index, 1);
+  saveMessages(messages);
+  res.json({ message: "Post deleted" });
+});
+
+app.put("/api/messages/:id", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const messages = loadMessages();
+  const msg = messages.find(m => m.id === parseInt(req.params.id, 10));
+  if (!msg) return res.status(404).json({ error: "Not found" });
+  if (msg.username !== req.session.username) return res.status(403).json({ error: "Forbidden" });
+  msg.message = sanitizeHtml(req.body.message, { allowedTags: [], allowedAttributes: {} });
+  saveMessages(messages);
+  res.json(msg);
+});
+
+app.post("/api/messages/like/:id", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const messages = loadMessages();
+  const msg = messages.find(m => m.id === parseInt(req.params.id, 10));
+  if (!msg) return res.status(404).json({ error: "Not found" });
+  if (!msg.likes) msg.likes = [];
+  const idx = msg.likes.indexOf(req.session.username);
+  idx === -1 ? msg.likes.push(req.session.username) : msg.likes.splice(idx, 1);
+  saveMessages(messages);
+  res.json({ likes: msg.likes.length, liked: idx === -1 });
+});
+
+app.post("/api/messages/save/:id", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const messages = loadMessages();
+  const msg = messages.find(m => m.id === parseInt(req.params.id, 10));
+  if (!msg) return res.status(404).json({ error: "Not found" });
+  if (!msg.saves) msg.saves = [];
+  const idx = msg.saves.indexOf(req.session.username);
+  idx === -1 ? msg.saves.push(req.session.username) : msg.saves.splice(idx, 1);
+  saveMessages(messages);
+  res.json({ saves: msg.saves.length, saved: idx === -1 });
+});
+
+app.post("/api/change-password", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const { oldPassword, newPassword } = req.body;
+  const users = loadUsers();
+  const user = users[req.session.username];
+  if (!user || !bcrypt.compareSync(oldPassword, user.password)) return res.status(400).json({ error: "Incorrect password" });
+  if (!isPasswordSecure(newPassword)) return res.status(400).json({ error: "Weak password" });
+  user.password = bcrypt.hashSync(newPassword, 10);
+  saveUsers(users);
+  res.json({ message: "Password changed" });
+});
+
+app.use((err, req, res, next) => {
+  if (err.code === "EBADCSRFTOKEN") return res.status(403).json({ error: "Invalid CSRF token" });
+  next(err);
+});
+
+// ==========================================
+// 8. HELPER FUNCTIONS
+// ==========================================
+
+function loadMessages() { try { return fs.existsSync(DATA_FILE) ? JSON.parse(fs.readFileSync(DATA_FILE, "utf8")) : []; } catch { return []; } }
+function saveMessages(data) { fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2)); }
+function loadUsers() { try { return fs.existsSync(USERS_FILE) ? JSON.parse(fs.readFileSync(USERS_FILE, "utf8")) : {}; } catch { return {}; } }
+function saveUsers(data) { fs.writeFileSync(USERS_FILE, JSON.stringify(data, null, 2)); }
+function isPasswordSecure(pw) { return typeof pw === "string" && pw.length >= 8 && /[A-Z]/.test(pw) && /[a-z]/.test(pw) && /[0-9]/.test(pw) && /[^A-Za-z0-9]/.test(pw); }
+
+const PORT = process.env.PORT || 3000;
+const server = app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+server.on('error', (err) => err.code === 'EADDRINUSE' ? console.error(`Port ${PORT} in use.`) : console.error('Server error:', err));
+
+const DIRECTS_FILE = "storage/directs.json"; // NEW FILE DEFINITION
+
+function loadDirects() {
+  try { return fs.existsSync(DIRECTS_FILE) ? JSON.parse(fs.readFileSync(DIRECTS_FILE, "utf8")) : []; } 
+  catch { return []; }
+}
+function saveDirects(data) { fs.writeFileSync(DIRECTS_FILE, JSON.stringify(data, null, 2)); }
+
+// 1. Update "About Me"
+app.post("/api/update-about", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const users = loadUsers();
+  // Sanitize input
+  const aboutMe = sanitizeHtml(req.body.aboutMe || "", { allowedTags: [], allowedAttributes: {} });
+  
+  if (users[req.session.username]) {
+    users[req.session.username].about = aboutMe;
+    saveUsers(users);
+    res.json({ message: "Profile updated" });
+  } else {
+    res.status(404).json({ error: "User not found" });
+  }
+});
+
+// Follow a user
+app.post("/api/follow/:username", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const targetUser = req.params.username;
+  const currentUser = req.session.username;
+  
+  // Prevent following yourself
+  if (currentUser === targetUser) {
+    return res.status(400).json({ error: "Cannot follow yourself" });
+  }
+  
+  const users = loadUsers();
+  const target = users[targetUser];
+  const current = users[currentUser];
+  
+  if (!target) return res.status(404).json({ error: "User not found" });
+  
+  // Initialize arrays if they don't exist
+  if (!target.followers) target.followers = [];
+  if (!current.following) current.following = [];
+  
+  // Check if already following
+  if (current.following.includes(targetUser)) {
+    return res.status(400).json({ error: "Already following" });
+  }
+  
+  // Add to following list
+  current.following.push(targetUser);
+  // Add to followers list
+  target.followers.push(currentUser);
+  
+  saveUsers(users);
+  res.json({ 
+    followers: target.followers.length,
+    following: current.following.length
+  });
+});
+
+// Unfollow a user
+app.post("/api/unfollow/:username", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const targetUser = req.params.username;
+  const currentUser = req.session.username;
+  
+  // Prevent following yourself
+  if (currentUser === targetUser) {
+    return res.status(400).json({ error: "Cannot unfollow yourself" });
+  }
+  
+  const users = loadUsers();
+  const target = users[targetUser];
+  const current = users[currentUser];
+  
+  if (!target) return res.status(404).json({ error: "User not found" });
+  
+  // Check if following
+  if (!current.following || !current.following.includes(targetUser)) {
+    return res.status(400).json({ error: "Not following" });
+  }
+  
+  // Remove from following list
+  current.following = current.following.filter(u => u !== targetUser);
+  // Remove from followers list
+  target.followers = target.followers.filter(u => u !== currentUser);
+  
+  saveUsers(users);
+  res.json({ 
+    followers: target.followers.length,
+    following: current.following.length
+  });
+});
+
+// Update the user info endpoint to include followers/following
+app.get("/api/user-info/:username", (req, res) => {
+  const targetUser = req.params.username;
+  // Decode if it comes in encoded
+  const decodedUser = decodeURIComponent(targetUser);
+  const users = loadUsers();
+  const user = users[decodedUser];
+  
+  if (user) {
+    res.json({
+      username: decodedUser,
+      pfp: user.pfp,
+      about: user.about || "No bio yet.",
+      followers: user.followers || [],
+      following: user.following || []
+    });
+  } else {
+    res.status(404).json({ error: "User not found" });
+  }
+});
+
+// 3. Get list of active conversations
+app.get("/api/directs/list", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const currentUser = req.session.username;
+  const directs = loadDirects();
+  const users = loadUsers();
+  
+  // Find all unique users this person has talked to
+  const talkedTo = new Set();
+  directs.forEach(msg => {
+    if (msg.sender === currentUser) talkedTo.add(msg.receiver);
+    if (msg.receiver === currentUser) talkedTo.add(msg.sender);
+  });
+
+  const conversationList = Array.from(talkedTo).map(username => ({
+    username: username,
+    pfp: users[username]?.pfp || null,
+
+  }));
+
+  res.json(conversationList);
+});
+
+// 4. Get Chat History with specific user
+app.get("/api/directs/history/:otherUser", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const currentUser = req.session.username;
+  const otherUser = decodeURIComponent(req.params.otherUser);
+  const directs = loadDirects();
+  
+  // Filter messages between these two users
+  const chat = directs.filter(msg => 
+    (msg.sender === currentUser && msg.receiver === otherUser) ||
+    (msg.sender === otherUser && msg.receiver === currentUser)
+  );
+  
+  // Sort by timestamp
+  chat.sort((a, b) => a.timestamp - b.timestamp);
+  res.json(chat);
+});
+
+// 5. Send a DM
+app.post("/api/directs/send", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const { receiver, message } = req.body;
+  
+  if (!message || !message.trim()) return res.status(400).json({ error: "Message empty" });
+
+  const sanitizedMessage = sanitizeHtml(message, { allowedTags: [], allowedAttributes: {} });
+  
+  const newDm = {
+    id: Date.now(),
+    sender: req.session.username,
+    receiver: receiver,
+    message: sanitizedMessage,
+    timestamp: Date.now()
+  };
+
+  const directs = loadDirects();
+  directs.push(newDm);
+  saveDirects(directs);
+  
+  res.json(newDm);
+});
+
+// ==========================================
+// RETWEET (RE-SLASH) FUNCTIONALITY
+// ==========================================
+
+// Check if user has retweeted a post
+app.get("/api/messages", (req, res) => {
+  const messages = loadMessages();
+  const users = loadUsers();
+  const currentUser = req.session.username;
+  
+  messages.forEach(msg => {
+    if(!msg.saves) msg.saves = [];
+    if(!msg.likes) msg.likes = [];
+    
+    // Add following status for this user
+    msg.following = users[msg.username]?.following || [];
+  });
+  
+  res.json(messages.filter(msg => !msg.parentId));
+});
+
+// Toggle retweet status
+app.post("/api/messages/retweet/:id", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const messages = loadMessages();
+  const msg = messages.find(m => m.id === parseInt(req.params.id, 10));
+  if (!msg) return res.status(404).json({ error: "Not found" });
+  
+  // Initialize retweets array if it doesn't exist
+  if (!msg.retweets) msg.retweets = [];
+  
+  const currentUser = req.session.username;
+  const idx = msg.retweets.indexOf(currentUser);
+  
+  if (idx === -1) {
+    // Add retweet
+    msg.retweets.push(currentUser);
+  } else {
+    // Remove retweet
+    msg.retweets.splice(idx, 1);
+  }
+  
+  saveMessages(messages);
+  res.json({ 
+    retweets: msg.retweets.length, 
+    retweeted: idx === -1,
+    retweetsList: msg.retweets 
+  });
+});
+
+// Get retweeted posts for a user
+app.get("/api/retweeted-posts", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  
+  const currentUser = req.session.username;
+  const messages = loadMessages();
+  
+  const retweetedPosts = messages.filter(msg => 
+    msg.retweets && msg.retweets.includes(currentUser)
+  );
+  
+  res.json(retweetedPosts);
+});
+
+
+//bug fix
+
+app.get("/api/check-user/:username", (req, res) => {
+  const targetUser = decodeURIComponent(req.params.username);
+  const users = loadUsers();
+  
+  if (users[targetUser]) {
+    res.json({ exists: true, username: targetUser });
+  } else {
+    res.json({ exists: false, username: targetUser });
+  }
+});
+
+// Update the existing history endpoint
+app.get("/api/directs/history/:otherUser", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const currentUser = req.session.username;
+  const otherUser = decodeURIComponent(req.params.otherUser);
+  
+  // Check if the other user exists
+  const users = loadUsers();
+  if (!users[otherUser]) {
+    return res.status(404).json({ error: "User not found" });
+  }
+  
+  const directs = loadDirects();
+  
+  // Filter messages between these two users
+  const chat = directs.filter(msg => 
+    (msg.sender === currentUser && msg.receiver === otherUser) ||
+    (msg.sender === otherUser && msg.receiver === currentUser)
+  );
+  
+  // Sort by timestamp
+  chat.sort((a, b) => a.timestamp - b.timestamp);
+  res.json(chat);
+});
+
+// Update the send DM endpoint
+app.post("/api/directs/send", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const { receiver, message } = req.body;
+  
+  // Check if receiver exists
+  const users = loadUsers();
+  if (!users[receiver]) {
+    return res.status(404).json({ error: "User not found" });
+  }
+  
+  if (!message || !message.trim()) return res.status(400).json({ error: "Message empty" });
+
+  const sanitizedMessage = sanitizeHtml(message, { allowedTags: [], allowedAttributes: {} });
+  
+  const newDm = {
+    id: Date.now(),
+    sender: req.session.username,
+    receiver: receiver,
+    message: sanitizedMessage,
+    timestamp: Date.now()
+  };
+
+  const directs = loadDirects();
+  directs.push(newDm);
+  saveDirects(directs);
+  
+  res.json(newDm);
+});
+
+
+const monitoringData = {
+  requests: new Map(),
+  blocks: new Map(),
+  blacklist: new Set(),
+  whitelist: new Set(['151.238.130.92']),
+  tempBlacklist: new Map()
+};
+
+const WAF_CONFIG = {
+  RATE_LIMIT: 10,
+  RATE_WINDOW: 60000,
+  BURST_LIMIT: 5,
+  BURST_WINDOW: 5000,
+  SUSPICIOUS_SCORE_THRESHOLD: 3,
+  TEMP_BAN_DURATION: 10 * 60 * 1000,
+  PERM_BAN_THRESHOLD: 3,
+  ANOMALY_DECAY: 5 * 60 * 1000
+};
+
+const attackPatterns = {
+  xss: [
+    /<script[^>]*>.*?<\/script>/i,
+    /javascript:/i,
+    /on\w+\s*=/i,
+    /alert\(/i,
+    /confirm\(/i,
+    /prompt\(/i,
+    /document\.cookie/i,
+    /window\.location/i,
+    /eval\(/i,
+    /setTimeout\(/i,
+    /setInterval\(/i
+  ],
+  sqlInjection: [
+    /(\%27)|(\')|(\-\-)/i,
+    /union.*select/i,
+    /select.*from/i,
+    /insert.*into/i,
+    /delete.*from/i,
+    /drop.*table/i,
+    /update.*set/i,
+    /exec\(/i,
+    /xp_cmdshell/i
+  ],
+  pathTraversal: [
+    /\.\.\//,
+    /\.\.\\/,
+    /\.\.%2f/i,
+    /\.\.%5c/i,
+    /%2e%2e%2f/i
+  ],
+  commandInjection: [
+    /\|\s*\w+/i,
+    /;\s*\w+/i,
+    /&&\s*\w+/i,
+    /\$\{.*\}/i,
+    /`.*`/i,
+    /system\(/i,
+    /exec\(/i,
+    /passthru\(/i
+  ],
+  maliciousUpload: [
+    /\.php\d*/i,
+    /\.asp\d*/i,
+    /\.jsp\d*/i,
+    /\.cgi/i,
+    /\.pl/i,
+    /\.py/i,
+    /\.rb/i,
+    /\.sh/i,
+    /\.bat/i,
+    /\.cmd/i
+  ],
+  badUserAgents: [
+    /sqlmap/i,
+    /nmap/i,
+    /nikto/i,
+    /dirbuster/i,
+    /gobuster/i,
+    /burpsuite/i,
+    /wpscan/i,
+    /masscan/i,
+    /hydra/i,
+    /medusa/i
+  ]
+};
+
+function analyzeRequest(req, body) {
+  let score = 0;
+  const reasons = [];
+  const url = req.url;
+  const userAgent = req.get('User-Agent') || '';
+
+  for (const [type, patterns] of Object.entries(attackPatterns)) {
+    for (const pattern of patterns) {
+      if (pattern.test(url)) {
+        score += 3;
+        reasons.push(`${type}_in_url`);
+        break;
+      }
+    }
+  }
+
+  if (body) {
+    let bodyStr = '';
+    if (typeof body === 'string') {
+      bodyStr = body;
+    } else if (body.message) {
+      bodyStr = body.message;
+    } else if (body.aboutMe) {
+      bodyStr = body.aboutMe;
+    } else {
+      bodyStr = JSON.stringify(body);
+    }
+
+    for (const [type, patterns] of Object.entries(attackPatterns)) {
+      for (const pattern of patterns) {
+        if (pattern.test(bodyStr)) {
+          score += 5;
+          reasons.push(`${type}_in_body`);
+          break;
+        }
+      }
+    }
+  }
+
+  for (const pattern of attackPatterns.badUserAgents) {
+    if (pattern.test(userAgent)) {
+      score += 4;
+      reasons.push('malicious_user_agent');
+      break;
+    }
+  }
+
+  return { score, reasons };
+}
+
+const requestTracker = new Map();
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  if (!requestTracker.has(ip)) {
+    requestTracker.set(ip, { requests: [], bursts: [] });
+  }
+  const tracker = requestTracker.get(ip);
+  tracker.requests = tracker.requests.filter(t => now - t < WAF_CONFIG.RATE_WINDOW);
+  tracker.bursts = tracker.bursts.filter(t => now - t < WAF_CONFIG.BURST_WINDOW);
+  const isRateLimited = tracker.requests.length >= WAF_CONFIG.RATE_LIMIT;
+  const isBursting = tracker.bursts.length >= WAF_CONFIG.BURST_LIMIT;
+  tracker.requests.push(now);
+  tracker.bursts.push(now);
+  return { isRateLimited, isBursting, requestCount: tracker.requests.length, burstCount: tracker.bursts.length };
+}
+
+function escapeHtml(str) {
+  return str.replace(/[&<>]/g, function(m) {
+    if (m === '&') return '&amp;';
+    if (m === '<') return '&lt;';
+    if (m === '>') return '&gt;';
+    return m;
+  }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+    return c;
+  });
+}
+
+function getBanPage(banInfo) {
+  const remaining = Math.ceil((banInfo.until - Date.now()) / 1000);
+  const minutes = Math.floor(remaining / 60);
+  const seconds = remaining % 60;
+  const safeReason = escapeHtml(banInfo.reason);
+  return `<!DOCTYPE html>
+  <html><head><meta charset="UTF-8"><title>Access Denied</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+    .card{background:#fff;border-radius:20px;padding:40px;text-align:center;max-width:500px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+    h1{color:#e74c3c;margin:20px 0}
+    .timer{background:#2c3e50;color:#fff;padding:15px;border-radius:10px;margin:20px 0;font-size:24px;font-weight:bold}
+    button{background:#e74c3c;color:#fff;border:none;padding:12px 30px;border-radius:8px;cursor:pointer;margin-top:20px}
+  </style></head>
+  <body><div class="card"><div style="font-size:80px">🔒</div>
+  <h1>Access Denied</h1><p>Your IP has been temporarily blocked due to suspicious activity.</p>
+  <div class="timer"><div>Time Remaining:</div><div id="timer">${minutes}:${seconds.toString().padStart(2,'0')}</div></div>
+  <p><strong>Reason:</strong> ${safeReason}</p><button onclick="location.reload()">Check Again</button></div>
+  <script>let r=${remaining};const e=document.getElementById('timer');setInterval(()=>{if(r<=0)location.reload();const m=Math.floor(r/60),s=r%60;e.innerText=m+':'+s.toString().padStart(2,'0');r--;},1000);</script></body></html>`;
+}
+
+function getPermanentBanPage(ip, reason) {
+  const safeIp = escapeHtml(ip);
+  const safeReason = escapeHtml(reason);
+  return `<!DOCTYPE html>
+  <html><head><meta charset="UTF-8"><title>Permanently Banned</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:sans-serif;background:linear-gradient(135deg,#1a1a2e,#16213e);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+    .card{background:#fff;border-radius:20px;padding:40px;text-align:center;max-width:500px}
+    h1{color:#e74c3c;margin:20px 0}
+  </style></head>
+  <body><div class="card"><div style="font-size:80px">⛔</div>
+  <h1>Permanently Banned</h1><p>Your IP has been permanently banned due to repeated malicious activity.</p>
+  <p><strong>Reason:</strong> ${safeReason}</p><p>IP: ${safeIp}</p></div></body></html>`;
+}
+
+app.use((req, res, next) => {
+  const ip = req.ip;
+  const now = Date.now();
+
+  if (monitoringData.whitelist.has(ip)) return next();
+
+  if (monitoringData.blacklist.has(ip)) {
+    return res.status(403).send(getPermanentBanPage(ip, monitoringData.blocks.get(ip)?.reason));
+  }
+
+  if (monitoringData.tempBlacklist.has(ip)) {
+    const ban = monitoringData.tempBlacklist.get(ip);
+    if (now < ban.until) {
+      return res.status(429).send(getBanPage(ban));
+    } else {
+      monitoringData.tempBlacklist.delete(ip);
+    }
+  }
+
+  const analysis = analyzeRequest(req, req.body);
+  const rate = checkRateLimit(ip);
+
+  if (!monitoringData.requests.has(ip)) {
+    monitoringData.requests.set(ip, {
+      firstSeen: now,
+      lastSeen: now,
+      totalRequests: 0,
+      suspiciousScore: 0,
+      violations: []
+    });
+  }
+  const ipData = monitoringData.requests.get(ip);
+  ipData.lastSeen = now;
+  ipData.totalRequests++;
+
+  if (analysis.score > 0) {
+    ipData.suspiciousScore += analysis.score;
+    ipData.violations.push({ time: now, score: analysis.score, reasons: analysis.reasons, path: req.path });
+
+    const logEntry = JSON.stringify({
+      ip, time: new Date().toISOString(), score: analysis.score, reasons: analysis.reasons, path: req.path, method: req.method
+    }) + "\n";
+    fs.appendFile("waf_alerts.json", logEntry, (err) => {
+      if (err) console.error("WAF alert log error:", err);
+    });
+    console.log(`[WAF] Alert from ${ip}: score ${analysis.score}, reasons: ${analysis.reasons.join(',')}`);
+  }
+
+  const oldViolations = ipData.violations.filter(v => now - v.time < WAF_CONFIG.ANOMALY_DECAY);
+  ipData.violations = oldViolations;
+  ipData.suspiciousScore = oldViolations.reduce((sum, v) => sum + v.score, 0);
+
+  let shouldBlock = false;
+  let blockReason = '';
+  if (ipData.suspiciousScore >= WAF_CONFIG.SUSPICIOUS_SCORE_THRESHOLD) {
+    shouldBlock = true;
+    blockReason = `Suspicious score: ${ipData.suspiciousScore}`;
+  }
+  if (rate.isRateLimited || rate.isBursting) {
+    shouldBlock = true;
+    blockReason = `Rate limit: ${rate.requestCount} req/min, burst ${rate.burstCount}`;
+  }
+
+  if (shouldBlock) {
+    const blockCount = (monitoringData.blocks.get(ip)?.count || 0) + 1;
+    monitoringData.blocks.set(ip, { count: blockCount, lastBlock: now, reason: blockReason });
+
+    if (blockCount >= WAF_CONFIG.PERM_BAN_THRESHOLD) {
+      monitoringData.blacklist.add(ip);
+      console.log(`[WAF] PERMANENT BAN: ${ip} - ${blockReason}`);
+      fs.appendFile("permanent_bans.txt", `${new Date().toISOString()} - ${ip} - ${blockReason}\n`, (err) => {
+        if (err) console.error("Permanent ban log error:", err);
+      });
+      return res.status(403).send(getPermanentBanPage(ip, blockReason));
+    }
+
+    monitoringData.tempBlacklist.set(ip, { until: now + WAF_CONFIG.TEMP_BAN_DURATION, reason: blockReason });
+    console.log(`[WAF] TEMP BAN: ${ip} - ${blockReason}`);
+    return res.status(429).send(getBanPage({ ip, until: now + WAF_CONFIG.TEMP_BAN_DURATION, reason: blockReason }));
+  }
+
+  next();
+});
+
+app.get("/api/ban-status", (req, res) => {
+  const ip = req.ip;
+  if (monitoringData.blacklist.has(ip)) {
+    return res.json({ banned: true, permanent: true, reason: monitoringData.blocks.get(ip)?.reason });
+  }
+  if (monitoringData.tempBlacklist.has(ip)) {
+    const ban = monitoringData.tempBlacklist.get(ip);
+    return res.json({
+      banned: true,
+      permanent: false,
+      until: ban.until,
+      remainingSeconds: Math.ceil((ban.until - Date.now()) / 1000),
+      reason: ban.reason
+    });
+  }
+  res.json({ banned: false });
+});
+
+app.get("/api/waf/stats", (req, res) => {
+  if (!monitoringData.whitelist.has(req.ip)) return res.status(403).json({ error: "Access denied" });
+  const stats = {
+    activeIPs: monitoringData.requests.size,
+    blacklistedIPs: monitoringData.blacklist.size,
+    tempBannedIPs: monitoringData.tempBlacklist.size,
+    totalBlocks: monitoringData.blocks.size,
+    topViolators: Array.from(monitoringData.requests.entries())
+      .map(([ip, d]) => ({ ip, score: d.suspiciousScore, requests: d.totalRequests, violations: d.violations.length }))
+      .sort((a,b) => b.score - a.score).slice(0,10),
+    recentAlerts: (() => {
+      try {
+        if (fs.existsSync("waf_alerts.json")) {
+          const data = fs.readFileSync("waf_alerts.json", "utf8");
+          return data.split('\n').filter(l => l).slice(-20);
+        }
+        return [];
+      } catch (e) {
+        return [];
+      }
+    })()
+  };
+  res.json(stats);
+});
+
+setInterval(() => {
+  const now = Date.now();
+  const oneDay = 24 * 60 * 60 * 1000;
+  for (const [ip, data] of monitoringData.requests.entries()) {
+    if (now - data.lastSeen > oneDay) monitoringData.requests.delete(ip);
+  }
+  for (const [ip, data] of monitoringData.tempBlacklist.entries()) {
+    if (now > data.until) monitoringData.tempBlacklist.delete(ip);
+  }
+  for (const [ip, data] of monitoringData.blocks.entries()) {
+    if (now - data.lastBlock > 7 * oneDay) monitoringData.blocks.delete(ip);
+  }
+  for (const [ip, data] of requestTracker.entries()) {
+    if (data.requests.length === 0 && data.bursts.length === 0) {
+      requestTracker.delete(ip);
+    } else {
+      const lastRequest = Math.max(...data.requests, ...data.bursts);
+      if (now - lastRequest > oneDay) requestTracker.delete(ip);
+    }
+  }
+}, 60 * 60 * 1000);
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cybers/ash - DMs</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+        <img src="./title.png" alt="Cybers/ash" class="logo" onclick="window.location.href='./index.html'" style="cursor:pointer;">
+    </header>
+    <div class="sidebar">
+      <img src="Gemini_Generated_Image_tkdpcstkdpcstkdp.png" alt="Cybers/ash Logo" class="nav-icon" href="./index.html">
+      <a href="./index.html">
+        <img src="images.png" alt="Home" class="nav-icon-small">
+        Home
+      </a>
+      <a href="./directs.html">
+        <img src="images (1).png" alt="Direct Messages" class="nav-icon-small">
+        Direct Messages
+      </a>
+      <a href="./liked_saved.html">
+        <img src="images (2).png" alt="Reacted Posts" class="nav-icon-small">
+        Reacted Posts
+      </a>
+      <a href="./premium.html">
+        <img src="images (3).png" alt="Premium" class="nav-icon-small">
+        / Premium
+      </a>
+      <a href="./about.html">
+        <img src="images (4).png" alt="About" class="nav-icon-small">
+        About
+      </a>
+      <a href="./contact.html">
+        <img src="images (5).png" alt="Contact" class="nav-icon-small">
+        Contact
+      </a>
+    </div>
+
+    <div id="userListView" style="display:none;" class="dm-container">
+        <h2>Direct Messages</h2>
+        <div id="dmList"></div>
+    </div>
+
+    <div id="chatInterfaceView" style="display:none;" class="chat-view">
+        <div class="chat-header">
+            <button class="back-btn" onclick="window.location.href='./directs.html'">←</button>
+            <img id="chatHeaderPfp" src="" style="width:30px; height:30px; border-radius:50%; margin-right:10px;">
+            <h3 id="chatHeaderUsername" style="margin:0; color:white;"></h3>
+        </div>
+        
+        <div id="chatMessages" class="chat-messages-area">
+            </div>
+
+        <div class="chat-input-area">
+            <input type="text" id="dmInput" placeholder="Type a message...">
+            <button id = "dmSendBtn" onclick="sendDm()">Send</button>
+        </div>
+    </div>
+    <!-- <p><i>© Cyberslash® LLC. 2026, All rights reserved.</i></p> -->
+  </div>
+<!-- Mobile Navbar -->
+<div class="mobile-navbar">
+    <div class="nav-items">
+        <img src="Gemini_Generated_Image_tkdpcstkdpcstkdp.png" alt="Cybers/ash Logo" class="nav-icon" href="./index.html">
+        <a href="./index.html" class="nav-item">
+            <img src="images.png" alt="Home" class="nav-icon-small">
+        </a>
+        <a href="./directs.html" class="nav-item">
+            <img src="images (1).png" alt="Direct Messages" class="nav-icon-small">
+        </a>
+        <a href="./liked_saved.html" class="nav-item">
+            <img src="images (2).png" alt="Reacted Posts" class="nav-icon-small">
+        </a>
+        <a href="./premium.html" class="nav-item">
+            <img src="images (3).png" alt="Premium" class="nav-icon-small">
+        </a>
+        <a href="./about.html" class="nav-item">
+            <img src="images (4).png" alt="About" class="nav-icon-small">
+        </a>
+        <a href="./contact.html" class="nav-item">
+            <img src="images (5).png" alt="Contact" class="nav-icon-small">
+        </a>
+    </div>
+</div>
+<script>
+let currentSessionUsername = "";
+let chatTargetUser = "";
+let csrfToken = "";
+let messageInterval = null;
+
+// Get URL Param
+const urlParams = new URLSearchParams(window.location.search);
+const targetUserParam = urlParams.get('user');
+
+document.addEventListener("DOMContentLoaded", () => {
+    fetch("/csrf-token").then(r=>r.json()).then(d=> { csrfToken = d.csrfToken; });
+
+    checkAuth().then(() => {
+        if (targetUserParam) {
+            // فقط اگر پارامتر user وجود داشت، چک کن و لود کن
+            checkUserAndLoad(targetUserParam);
+        } else {
+            // اگر پارامتر user وجود نداشت، لیست را نمایش بده
+            loadDmList();
+        }
+    });
+});
+
+function checkAuth() {
+  return fetch("/session", { credentials: "include" })
+    .then(res => {
+      if (!res.ok) throw new Error("Not logged in");
+      return res.json();
+    })
+    .then(user => {
+      currentSessionUsername = user.username;
+    })
+    .catch(() => {
+      window.location.href = "./index.html";
+    });
+}
+
+// --- LIST VIEW LOGIC ---
+function loadDmList() {
+    document.getElementById("userListView").style.display = "flex";
+    document.getElementById("chatInterfaceView").style.display = "none";
+    const listContainer = document.getElementById("dmList");
+    
+    fetch("/api/directs/list", { credentials: "include" })
+        .then(res => res.json())
+        .then(users => {
+            listContainer.innerHTML = "";
+            if (users.length === 0) {
+                listContainer.innerHTML = "<div class='dm-empty-state'>No Users Available In Direct Messages, Start Chatting!</div>";
+            } else {
+                users.forEach(u => {
+                    const div = document.createElement("div");
+                    div.className = "dm-list-item";
+                    div.innerHTML = `
+                        <img src="${u.pfp || 'favicon.ico'}">
+                        <span>${u.username}</span>
+                    `;
+                    div.onclick = () => window.location.href = `./directs.html?user=${encodeURIComponent(u.username)}`;
+                    listContainer.appendChild(div);
+                });
+            }
+        });
+}
+
+// --- CHAT INTERFACE LOGIC ---
+async function checkUserAndLoad(username) {
+    try {
+        const response = await fetch(`/api/check-user/${encodeURIComponent(username)}`);
+        const data = await response.json();
+        
+        if (!data.exists) {
+            // User doesn't exist - show error and redirect
+            alert(`User "${username}" does not exist.`);
+            window.location.href = './directs.html'; // برگرد به لیست
+            return;
+        }
+        
+        // User exists, load the chat
+        loadChatInterface(username);
+        
+    } catch (error) {
+        console.error('Error checking user:', error);
+        alert('Error loading user. Please try again.');
+        window.location.href = './directs.html';
+    }
+}
+
+function loadChatInterface(otherUser) {
+    // Stop any existing interval
+    if (messageInterval) {
+        clearInterval(messageInterval);
+    }
+    
+    document.getElementById("userListView").style.display = "none";
+    document.getElementById("chatInterfaceView").style.display = "flex";
+    chatTargetUser = decodeURIComponent(otherUser);
+    
+    // Setup Header
+    document.getElementById("chatHeaderUsername").textContent = chatTargetUser;
+    
+    // Get Other User PFP
+    fetch(`/api/user-info/${encodeURIComponent(chatTargetUser)}`)
+        .then(r => r.json())
+        .then(u => { 
+            document.getElementById("chatHeaderPfp").src = u.pfp || "favicon.ico"; 
+        })
+        .catch(() => {
+            document.getElementById("chatHeaderPfp").src = "favicon.ico";
+        });
+
+    loadMessages();
+    // Poll for new messages every 2 seconds
+    messageInterval = setInterval(loadMessages, 2000);
+}
+
+function loadMessages() {
+    fetch(`/api/directs/history/${encodeURIComponent(chatTargetUser)}`, { credentials: "include" })
+        .then(res => {
+            if (res.status === 404) {
+                // User might have been deleted while chatting
+                alert('User no longer exists');
+                window.location.href = './directs.html';
+                return;
+            }
+            return res.json();
+        })
+        .then(msgs => {
+            if (!msgs) return;
+            const chatBox = document.getElementById("chatMessages");
+            // Save scroll position
+            const wasScrolledToBottom = chatBox.scrollHeight - chatBox.scrollTop <= 100;
+            
+            // Clear and redraw
+            chatBox.innerHTML = "";
+            
+            msgs.forEach(msg => {
+                const isMe = msg.sender === currentSessionUsername;
+                const row = document.createElement("div");
+                row.className = `message-row ${isMe ? 'self' : 'other'}`;
+                
+                const pfpImg = document.createElement("img");
+                if (isMe) {
+                    // Get current user's PFP
+                    fetch(`/api/user-info/${encodeURIComponent(currentSessionUsername)}`)
+                        .then(r => r.json())
+                        .then(u => {
+                            pfpImg.src = u.pfp || "favicon.ico";
+                        })
+                        .catch(() => {
+                            pfpImg.src = "favicon.ico";
+                        });
+                } else {
+                    pfpImg.src = document.getElementById("chatHeaderPfp").src || "favicon.ico";
+                }
+                pfpImg.style.width = "30px";
+                pfpImg.style.height = "30px";
+                pfpImg.style.borderRadius = "50%";
+                
+                const bubble = document.createElement("div");
+                bubble.className = "bubble";
+                bubble.textContent = msg.message;
+                
+                row.appendChild(pfpImg);
+                row.appendChild(bubble);
+                chatBox.appendChild(row);
+            });
+            
+            // Scroll to bottom if was already near bottom
+            if (wasScrolledToBottom) {
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        })
+        .catch(err => console.error('Error loading messages:', err));
+}
+
+function sendDm() {
+    const input = document.getElementById("dmInput");
+    const text = input.value.trim();
+    if (!text) return;
+
+    fetch("/api/directs/send", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+        },
+        credentials: "include",
+        body: JSON.stringify({ receiver: chatTargetUser, message: text })
+    })
+    .then(res => {
+        if (res.status === 404) {
+            alert('User not found');
+            window.location.href = './directs.html';
+            return;
+        }
+        return res.json();
+    })
+    .then(newMsg => {
+        if (newMsg) {
+            input.value = "";
+            loadMessages(); // Refresh immediately
+        }
+    })
+    .catch(err => console.error('Error sending message:', err));
+}
+
+// Clean up interval when page unloads
+window.addEventListener('beforeunload', () => {
+    if (messageInterval) {
+        clearInterval(messageInterval);
+    }
+});
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cybers/ash - Contact Us</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div id="connectionStatus" class="connection-status">
+    <span id="connectionText"></span>
+    <div id="connectionSpinner" class="spinner"></div>
+  </div>
+  <div class="container">
+    <header>
+      <img src="./title.png" alt="Cybers/ash" class="logo" href="/index.html">
+    </header>
+    <div class="sidebar">
+      <img src="Gemini_Generated_Image_tkdpcstkdpcstkdp.png" alt="Cybers/ash Logo" class="nav-icon" href="./index.html">
+      <a href="./index.html">
+        <img src="images.png" alt="Home" class="nav-icon-small">
+        Home
+      </a>
+      <a href="./directs.html">
+        <img src="images (1).png" alt="Direct Messages" class="nav-icon-small">
+        Direct Messages
+      </a>
+      <a href="./liked_saved.html">
+        <img src="images (2).png" alt="Reacted Posts" class="nav-icon-small">
+        Reacted Posts
+      </a>
+      <a href="./premium.html">
+        <img src="images (3).png" alt="Premium" class="nav-icon-small">
+        / Premium
+      </a>
+      <a href="./about.html">
+        <img src="images (4).png" alt="About" class="nav-icon-small">
+        About
+      </a>
+      <a href="./contact.html">
+        <img src="images (5).png" alt="Contact" class="nav-icon-small">
+        Contact
+      </a>
+    </div>
+    
+    
+    <div class="form-container">
+      <iframe 
+        class="responsive-form"
+        src="https://docs.google.com/forms/d/e/1FAIpQLSdvVZHx4spwaVC-O9rLqAjxT7S9ebpXQDjjITJKD5ljip26Mw/viewform?embedded=true" 
+        frameborder="0" 
+        marginheight="0" 
+        marginwidth="0" 
+        title="Contact Form"
+        onload="adjustIframeHeight(this)">
+        Loading…
+      </iframe>
+    </div>
+    
+    <p><i>© Cyberslash® LLC. 2026, All rights reserved.</i></p>
+    
+    <!-- Mobile Navbar -->
+    <div class="mobile-navbar">
+      <div class="nav-items">
+        <img src="Gemini_Generated_Image_tkdpcstkdpcstkdp.png" alt="Cybers/ash Logo" class="nav-icon" href="./index.html">
+        <a href="./index.html" class="nav-item">
+          <img src="images.png" alt="Home" class="nav-icon-small">
+        </a>
+        <a href="./directs.html" class="nav-item">
+          <img src="images (1).png" alt="Direct Messages" class="nav-icon-small">
+        </a>
+        <a href="./liked_saved.html" class="nav-item">
+          <img src="images (2).png" alt="Reacted Posts" class="nav-icon-small">
+        </a>
+        <a href="./premium.html" class="nav-item">
+          <img src="images (3).png" alt="Premium" class="nav-icon-small">
+        </a>
+        <a href="./about.html" class="nav-item">
+          <img src="images (4).png" alt="About" class="nav-icon-small">
+        </a>
+        <a href="./contact.html" class="nav-item">
+          <img src="images (5).png" alt="Contact" class="nav-icon-small">
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    
+    function adjustIframeHeight(iframe) {
+      try {
+        
+        const windowHeight = window.innerHeight;
+        const headerHeight = 100;
+        const footerHeight = 50;
+        const padding = 40;
+        
+        
+        const availableHeight = windowHeight - headerHeight - footerHeight - padding;
+        
+        
+        const minHeight = 600;
+        const maxHeight = 1200;
+        let newHeight = Math.max(minHeight, Math.min(availableHeight, maxHeight));
+        
+        iframe.style.height = newHeight + 'px';
+        
+        
+        window.addEventListener('resize', function() {
+          adjustIframeHeight(iframe);
+        });
+      } catch (error) {
+        console.error('Error adjusting iframe height:', error);
+      }
+    }
+    
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      const iframe = document.querySelector('.responsive-form');
+      if (iframe) {
+        
+        iframe.onload = function() {
+          adjustIframeHeight(iframe);
+        };
+        
+        
+        if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
+          adjustIframeHeight(iframe);
+        }
+      }
+    });
+    // 1. Define the function
+    function checkAuth() {
+      fetch("/session", { credentials: "include" })
+        .then(res => {
+          if (!res.ok) throw new Error("Not logged in");
+          return res.json();
+        })
+        .then(user => {
+          // User IS logged in
+          console.log("Logged in as:", user.username);
+          
+          // Optional: Update UI elements if they exist on this page
+          const accountBtn = document.getElementById("accountBtn");
+          if (accountBtn) accountBtn.style.display = "block";
+
+          const accountUsername = document.getElementById("accountUsername");
+          if (accountUsername) accountUsername.textContent = user.username;
+
+          const accountPfp = document.getElementById("accountPfp");
+          if (accountPfp) accountPfp.src = user.pfp || "favicon.ico";
+
+          const fabBtn = document.getElementById("fabBtn");
+          if (fabBtn) fabBtn.style.display = "block";
+        })
+        .catch(() => {
+          // User is NOT logged in -> Redirect to Home
+          console.log("Access denied. Redirecting to /index.html");
+          window.location.href = "/index.html";
+        });
+    }
+
+    // Run the check as soon as the page loads
+    document.addEventListener("DOMContentLoaded", () => {
+      checkAuth();
+    });
+  </script>
+</body>
+</html>
+این رو میخوام خودت فرم پشتیبانی بسازی با فیلد های مناسب و خوب  باشه فقتی فرم درخواست پر شد اتوماتیک به
+ دایرکت مسیج ادمین ها بفرسته  و ادمین ها بتونن برسی و جواب بدن اگر یک ادمینی جواب داد برای بقیه ادمین ها اون درخواست بزنه جواب داده شده و اسم دایرکت یا همون ربات اتوماتیکی که درخواست میفرسته SUPBOT باشه با تیک ابی کنار اسمش و وقتی ادمین جواب داد اوتوماتیک به قسمت کانکت و کاربر اونجا ببینه کد هایی که قراره اضافه کنم رو بده حواست باشه باگ نداشته باشی
+میخوام یدونه فایل sup.json هم اضافه کنه درخواست ها و جواب ها توی اون ذخیره و لود بشه
+
+

@@ -1,0 +1,160 @@
+<!-- verify-2fa.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify your identity</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #000000;
+      color: #ffffff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      height: 550px;
+      width: 550px;
+      text-align: center;
+    }
+    .logo {
+      width: 100px;
+      height: 100px;
+      margin-bottom: 30px;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      margin-bottom: 15px;
+    }
+    p {
+      color: #71767b;
+      font-size: 16px;
+      margin-bottom: 30px;
+      line-height: 1.5;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid #2f3336;
+      background-color: #000000;
+      color: #ffffff;
+      font-size: 24px;
+      text-align: center;
+      letter-spacing: 8px;
+      outline: none;
+      margin-bottom: 20px;
+    }
+    .form-group input:focus {
+      border-color: #1d9bf0;
+    }
+    .verify-btn {
+      background-color: #1d9bf0;
+      color: #ffffff;
+      border: none;
+      padding: 14px 32px;
+      border-radius: 9999px;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+    }
+    .verify-btn:hover { background-color: #1a8cd8; }
+    .verify-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .error-message {
+      background-color: rgba(244, 67, 54, 0.1);
+      border: 1px solid #f44336;
+      color: #f44336;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+    .error-message.show { display: block; }
+    .back-link {
+      display: inline-block;
+      margin-top: 20px;
+      color: #1d9bf0;
+      text-decoration: none;
+      font-size: 15px;
+    }
+    .back-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img class = "logo" alt="Cyberslash Logo" src = "Gemini_Generated_Image_tkdpcstkdpcstkdp.png">
+    <h1>Enter your code</h1>
+    <p>Enter the 6-digit code from your authenticator app</p>
+    
+    <div id="errorMessage" class="error-message"></div>
+    
+    <div class="form-group">
+      <input type="text" id="twoFactorCode" placeholder="000000" maxlength="6" autocomplete="one-time-code">
+    </div>
+    
+    <button class="verify-btn" id="verifyBtn" onclick="verifyCode()">Verify</button>
+    <a href="/login.html" class="back-link">← Back to login</a>
+  </div>
+
+  <script>
+    let csrfToken = "";
+    fetch("/csrf-token", { credentials: "include" })
+      .then(res => res.json())
+      .then(data => csrfToken = data.csrfToken);
+
+    function showError(msg) {
+      const el = document.getElementById("errorMessage");
+      el.textContent = msg;
+      el.classList.add("show");
+    }
+
+    function verifyCode() {
+      const code = document.getElementById("twoFactorCode").value;
+      const username = sessionStorage.getItem("loginUsername");
+      
+      if (!code || code.length !== 6) {
+        showError("Please enter a valid 6-digit code");
+        return;
+      }
+
+      const btn = document.getElementById("verifyBtn");
+      btn.disabled = true;
+      btn.textContent = "Verifying...";
+
+      fetch("/login-2fa", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken
+        },
+        credentials: "include",
+        body: JSON.stringify({ username, code })
+      })
+      .then(res => {
+        if (!res.ok) throw new Error();
+        return res.json();
+      })
+      .then(() => {
+        window.location.href = "/index.html";
+      })
+      .catch(() => {
+        showError("Invalid authenticator code. Please try again.");
+        btn.disabled = false;
+        btn.textContent = "Verify";
+      });
+    }
+
+    document.getElementById("twoFactorCode").focus();
+    document.addEventListener("keypress", e => { if (e.key === "Enter") verifyCode(); });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cybers/ash - /Premium</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="stylesheet" href="./styles/style.css">
+  <style>
+    :root {
+      --theme-bg-primary: #000000;
+      --theme-bg-secondary: #111111;
+      --theme-bg-tertiary: #1a1a1a;
+      --theme-border: #333333;
+      --theme-text-primary: #ffffff;
+      --theme-text-secondary: #888888;
+      --theme-accent: #667eea;
+      --theme-accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    body.theme-default {
+      --theme-bg-primary: #000000;
+      --theme-bg-secondary: #111111;
+      --theme-bg-tertiary: #1a1a1a;
+      --theme-border: #333333;
+      --theme-text-primary: #ffffff;
+      --theme-text-secondary: #888888;
+      --theme-accent: #1d9bf0;
+      --theme-accent-gradient: linear-gradient(135deg, #1d9bf0 0%, #1d9bf0 100%);
+    }
+    body.theme-discord {
+      --theme-bg-primary: #36393f;
+      --theme-bg-secondary: #2f3136;
+      --theme-bg-tertiary: #202225;
+      --theme-border: #202225;
+      --theme-text-primary: #ffffff;
+      --theme-text-secondary: #b9bbbe;
+      --theme-accent: #5865f2;
+      --theme-accent-gradient: linear-gradient(135deg, #5865f2 0%, #7289da 100%);
+    }
+    body.theme-amethyst {
+      --theme-bg-primary: #1a1a2e;
+      --theme-bg-secondary: #16213e;
+      --theme-bg-tertiary: #0f3460;
+      --theme-border: #333;
+      --theme-text-primary: #ffffff;
+      --theme-text-secondary: #a0a0a0;
+      --theme-accent: #667eea;
+      --theme-accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    body.theme-aurora {
+      --theme-bg-primary: #0a192f;
+      --theme-bg-secondary: #112240;
+      --theme-bg-tertiary: #233554;
+      --theme-border: #233554;
+      --theme-text-primary: #e6f1ff;
+      --theme-text-secondary: #8892b0;
+      --theme-accent: #00c6ff;
+      --theme-accent-gradient: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
+    }
+    body.theme-sunset {
+      --theme-bg-primary: #1a1a1a;
+      --theme-bg-secondary: #2d2d2d;
+      --theme-bg-tertiary: #3d3d3d;
+      --theme-border: #444;
+      --theme-text-primary: #ffffff;
+      --theme-text-secondary: #aaa;
+      --theme-accent: #f093fb;
+      --theme-accent-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    body.theme-forest {
+      --theme-bg-primary: #0d2018;
+      --theme-bg-secondary: #142b1f;
+      --theme-bg-tertiary: #1b3d2a;
+      --theme-border: #1b3d2a;
+      --theme-text-primary: #e8f5e9;
+      --theme-text-secondary: #81c784;
+      --theme-accent: #38ef7d;
+      --theme-accent-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+    body.theme-ocean {
+      --theme-bg-primary: #0f1c3f;
+      --theme-bg-secondary: #1a3a6e;
+      --theme-bg-tertiary: #2a5298;
+      --theme-border: #2a5298;
+      --theme-text-primary: #e0efff;
+      --theme-text-secondary: #8cb4e8;
+      --theme-accent: #2a5298;
+      --theme-accent-gradient: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    }
+    body.theme-midnight {
+      --theme-bg-primary: #0f0c29;
+      --theme-bg-secondary: #1a1a3a;
+      --theme-bg-tertiary: #302b63;
+      --theme-border: #302b63;
+      --theme-text-primary: #e0e0e0;
+      --theme-text-secondary: #9090a0;
+      --theme-accent: #764ba2;
+      --theme-accent-gradient: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    }
+    body.theme-fire {
+      --theme-bg-primary: #1a0a0a;
+      --theme-bg-secondary: #2d1515;
+      --theme-bg-tertiary: #4a1f1f;
+      --theme-border: #4a1f1f;
+      --theme-text-primary: #fff0f0;
+      --theme-text-secondary: #d0a0a0;
+      --theme-accent: #f5af19;
+      --theme-accent-gradient: linear-gradient(135deg, #f12711 0%, #f5af19 100%);
+    }
+    body {
+      background-color: var(--theme-bg-primary) !important;
+      background-attachment: fixed; /* Add this */
+      color: var(--theme-text-primary);
+    }
+    
+    .premium-container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      padding-bottom: 80px;
+    }
+    
+    .premium-hero {
+      text-align: center;
+      padding: 40px 20px;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      border-radius: 20px;
+      margin-bottom: 30px;
+      border: 1px solid #333;
+    }
+    
+    .premium-hero h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .premium-hero p {
+      color: #aaa;
+      font-size: 1.1rem;
+    }
+    
+    .premium-badge {
+      display: inline-block;
+      color: #ffffff;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 0.9rem;
+      margin-top: 15px;
+      background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
+    }
+    
+    .premium-locked {
+      text-align: center;
+      padding: 60px 20px;
+      background: var(--theme-bg-secondary);
+      border-radius: 20px;
+      border: 1px solid var(--theme-border);
+    }
+    
+    .premium-locked h2 {
+      color: var(--theme-text-primary);
+      margin-bottom: 15px;
+    }
+    
+    .premium-locked p {
+      color: var(--theme-text-secondary);
+      margin-bottom: 20px;
+    }
+    
+    .premium-locked .lock-icon {
+      font-size: 4rem;
+      margin-bottom: 20px;
+    }
+    
+    .premium-locked a {
+      display: inline-block;
+      background: var(--theme-accent-gradient);
+      color: white;
+      padding: 12px 30px;
+      border-radius: 25px;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    
+    .feature-card {
+      background: var(--theme-bg-secondary);
+      border: 1px solid var(--theme-border);
+      border-radius: 16px;
+      padding: 25px;
+      margin-bottom: 20px;
+      transition: all 0.3s ease;
+    }
+    
+    .feature-card:hover {
+      border-color: var(--theme-accent);
+      transform: translateY(-3px);
+      box-shadow: 0 10px 40px rgba(102, 126, 234, 0.15);
+    }
+    
+    .feature-header {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+    
+    .feature-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+    
+    .feature-icon.group { background: var(--theme-accent-gradient); }
+    .feature-icon.theme { background: linear-gradient(135deg, #f093fb, #f5576c); }
+    .feature-icon.bg { background: linear-gradient(135deg, #11998e, #38ef7d); }
+    .feature-icon.username { background: linear-gradient(135deg, #00c6ff, #0072ff); }
+    .feature-icon.video { background: linear-gradient(135deg, #ee0979, #ff6a00); }
+    .feature-icon.pfp { background: linear-gradient(135deg, #667eea, #764ba2); }
+    
+    .feature-title {
+      color: var(--theme-text-primary);
+      font-size: 1.3rem;
+      font-weight: bold;
+    }
+    
+    .feature-desc {
+      color: var(--theme-text-secondary);
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    
+    .preview-box {
+      background: var(--theme-bg-primary);
+      border: 1px solid var(--theme-border);
+      border-radius: 12px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .preview-label {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: var(--theme-accent);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+    
+    .preview-note {
+      text-align: center;
+      color: var(--theme-text-secondary);
+      font-size: 0.85rem;
+      margin-top: 15px;
+      padding: 10px;
+      background: var(--theme-bg-tertiary);
+      border-radius: 8px;
+    }
+    .preview-note strong {
+      color: var(--theme-accent);
+    }
+    
+    .group-preview {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .group-preview-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--theme-border);
+    }
+    
+    .group-avatar-preview {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--theme-accent-gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+    }
+    
+    .group-info-preview h4 {
+      color: var(--theme-text-primary);
+      margin: 0;
+      font-size: 0.95rem;
+    }
+    
+    .group-info-preview span {
+      color: var(--theme-text-secondary);
+      font-size: 0.8rem;
+    }
+    
+    .group-members-preview {
+      display: flex;
+      gap: 5px;
+    }
+    
+    .member-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #333;
+      border: 2px solid var(--theme-bg-primary);
+    }
+    
+    .member-count {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--theme-accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 0.7rem;
+      font-weight: bold;
+    }
+    
+    .theme-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+    
+    .theme-preview-item {
+      aspect-ratio: 1;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    
+    .theme-preview-item:hover {
+      transform: scale(1.1);
+    }
+    
+    .theme-preview-item.active {
+      border-color: white;
+      box-shadow: 0 0 10px rgba(255,255,255,0.5);
+    }
+    
+    .bg-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    
+    .bg-preview-item {
+      aspect-ratio: 16/9;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    .bg-preview-item:hover {
+      transform: scale(1.05);
+    }
+    
+    .bg-preview-item.active {
+      border-color: white;
+      box-shadow: 0 0 10px rgba(255,255,255,0.5);
+    }
+    
+    .bg-preview-item::after {
+      content: "✓";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.7);
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: bold;
+    }
+    
+    .bg-preview-item.active::after {
+      display: flex;
+    }
+    
+    .username-preview {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 15px;
+      background: var(--theme-bg-tertiary);
+      border-radius: 8px;
+    }
+    
+    .username-preview-pfp {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--theme-accent-gradient);
+    }
+    
+    .username-preview-info h4 {
+      color: var(--theme-text-primary);
+      margin: 0;
+      font-size: 1rem;
+    }
+    
+    .username-preview-info span {
+      color: var(--theme-accent);
+      font-size: 0.9rem;
+    }
+    
+    .video-preview-container {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    
+    .video-preview-item {
+      text-align: center;
+    }
+    
+    .video-preview-icon {
+      width: 80px;
+      height: 80px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      margin: 0 auto 8px;
+    }
+    
+    .video-preview-icon.post {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+    }
+    
+    .video-preview-label {
+      color: var(--theme-text-secondary);
+      font-size: 0.8rem;
+    }
+    
+    .pfp-preview-container {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    
+    .pfp-preview-item {
+      text-align: center;
+    }
+    
+    .pfp-preview-img {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid var(--theme-accent);
+      margin-bottom: 8px;
+    }
+    
+    .pfp-preview-label {
+      color: var(--theme-text-secondary);
+      font-size: 0.8rem;
+    }
+    
+    .pfp-preview-img.gif {
+      border-color: #f093fb;
+    }
+    
+    .pfp-preview-img.video {
+      border-color: #f5576c;
+    }
+    
+    .coming-soon {
+      display: inline-block;
+      background: var(--theme-bg-tertiary);
+      color: var(--theme-text-secondary);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      margin-top: 10px;
+    }
+    
+    .save-settings-btn {
+      display: block;
+      width: 100%;
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 12px;
+      border: none;
+      background: var(--theme-accent-gradient);
+      color: white;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    
+    .save-settings-btn:hover {
+      transform: scale(1.02);
+    }
+    
+    .save-settings-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .save-message {
+      text-align: center;
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 8px;
+      display: none;
+    }
+    
+    .save-message.success {
+      display: block;
+      background: rgba(76, 175, 80, 0.2);
+      color: #4CAF50;
+    }
+    
+    .save-message.error {
+      display: block;
+      background: rgba(244, 67, 54, 0.2);
+      color: #f44336;
+    }
+    
+    .premium-footer {
+      text-align: center;
+      padding: 30px;
+      color: var(--theme-text-secondary);
+    }
+    
+    .premium-footer a {
+      color: var(--theme-accent);
+      text-decoration: none;
+    }
+    
+    .sidebar {
+      background-color: var(--theme-bg-secondary) !important;
+    }
+    
+    .sidebar a {
+      color: var(--theme-text-secondary) !important;
+    }
+    
+    .sidebar a:hover {
+      background-color: var(--theme-bg-tertiary) !important;
+      color: var(--theme-text-primary) !important;
+    }
+    
+    .mobile-navbar {
+      background-color: var(--theme-bg-secondary) !important;
+      border-top: 1px solid var(--theme-border) !important;
+    }
+    
+    @media (max-width: 600px) {
+      .premium-hero h1 {
+        font-size: 1.8rem;
+      }
+      
+      .theme-preview-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      
+      .bg-preview-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    .custom-bg-upload {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid var(--theme-border);
+    }
+
+    .custom-bg-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      background: var(--theme-bg-tertiary);
+      border: 2px dashed var(--theme-border);
+      border-radius: 10px;
+      cursor: pointer;
+      color: var(--theme-text-secondary);
+      font-size: 0.9rem;
+      transition: all 0.3s ease;
+    }
+
+    .custom-bg-label:hover {
+      border-color: var(--theme-accent);
+      color: var(--theme-accent);
+    }
+
+    .custom-bg-preview {
+      position: relative;
+      margin-top: 15px;
+      display: inline-block;
+    }
+
+    .custom-bg-preview img {
+      width: 120px;
+      height: 70px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 2px solid var(--theme-accent);
+    }
+
+    .remove-bg-btn {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #f44336;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .remove-bg-btn:hover {
+      background: #d32f2f;
+    }
+
+    .custom-bg-upload {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid var(--theme-border);
+    }
+
+    .custom-bg-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      background: var(--theme-bg-tertiary);
+      border: 2px dashed var(--theme-border);
+      border-radius: 10px;
+      cursor: pointer;
+      color: var(--theme-text-secondary);
+      font-size: 0.9rem;
+      transition: all 0.3s ease;
+    }
+
+    .custom-bg-label:hover {
+      border-color: var(--theme-accent);
+      color: var(--theme-accent);
+    }
+
+    .custom-bg-preview {
+      position: relative;
+      margin-top: 15px;
+      display: inline-block;
+    }
+
+    .custom-bg-preview img {
+      width: 120px;
+      height: 70px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 2px solid var(--theme-accent);
+    }
+
+    .remove-bg-btn {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #f44336;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .remove-bg-btn:hover {
+      background: #d32f2f;
+    }
+
+    /* Transparent sidebar and navbar when custom background is active */
+    body.has-custom-bg .sidebar,
+    body.has-custom-bg .mobile-navbar {
+      background-color: rgba(0, 0, 0, 0.5) !important;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    /* For different themes, adjust transparency */
+    body.theme-discord.has-custom-bg .sidebar,
+    body.theme-discord.has-custom-bg .mobile-navbar {
+      background-color: rgba(47, 49, 54, 0.7) !important;
+    }
+
+    body.theme-amethyst.has-custom-bg .sidebar,
+    body.theme-amethyst.has-custom-bg .mobile-navbar {
+      background-color: rgba(26, 26, 46, 0.7) !important;
+    }
+
+    body.theme-aurora.has-custom-bg .sidebar,
+    body.theme-aurora.has-custom-bg .mobile-navbar {
+      background-color: rgba(10, 25, 47, 0.7) !important;
+    }
+
+    body.theme-sunset.has-custom-bg .sidebar,
+    body.theme-sunset.has-custom-bg .mobile-navbar {
+      background-color: rgba(26, 26, 26, 0.7) !important;
+    }
+
+    body.theme-forest.has-custom-bg .sidebar,
+    body.theme-forest.has-custom-bg .mobile-navbar {
+      background-color: rgba(13, 32, 24, 0.7) !important;
+    }
+
+    body.theme-ocean.has-custom-bg .sidebar,
+    body.theme-ocean.has-custom-bg .mobile-navbar {
+      background-color: rgba(15, 28, 63, 0.7) !important;
+    }
+
+    body.theme-midnight.has-custom-bg .sidebar,
+    body.theme-midnight.has-custom-bg .mobile-navbar {
+      background-color: rgba(15, 12, 41, 0.7) !important;
+    }
+
+    body.theme-fire.has-custom-bg .sidebar,
+    body.theme-fire.has-custom-bg .mobile-navbar {
+      background-color: rgba(26, 10, 10, 0.7) !important;
+    }
+
+    /* Default theme transparency */
+    body.theme-default.has-custom-bg .sidebar,
+    body.theme-default.has-custom-bg .mobile-navbar {
+      background-color: rgba(17, 17, 17, 0.7) !important;
+    }
+
+    .logoName {
+        font-size: 6rem;
+        color: #000000;
+        text-shadow:
+        0 0 5px #ffffff,
+        0 0 10px #ffffff,
+        0 0 20px #ffffff,
+        0 0 40px #ffffff;
+        font-weight: normal;
+        text-align: center;
+        margin: 0px;
+        font-family: sans-serif;
+    }
+
+    @media (max-width: 600px) {
+    .logoName {
+        font-size: 3rem;
+    }
+    }
+    .main-content{
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+/* --- Payment Section Styles --- */
+.premium-payment-section {
+  margin-top: 30px;
+}
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 25px;
+}
+.pricing-card {
+  background: var(--theme-bg-tertiary);
+  border: 1px solid var(--theme-border);
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+.pricing-card:hover {
+  border-color: var(--theme-accent);
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+}
+.pricing-card.selected {
+  border-color: var(--theme-accent);
+  background: rgba(102, 126, 234, 0.1);
+}
+.pricing-card.selected::after {
+  content: "✓";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: var(--theme-accent);
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+}
+.pricing-duration {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: var(--theme-text-primary);
+  margin-bottom: 8px;
+}
+.pricing-price {
+  font-size: 1.4rem;
+  font-weight: 800;
+  background: var(--theme-accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 5px;
+}
+.pricing-desc {
+  font-size: 0.85rem;
+  color: var(--theme-text-secondary);
+}
+.payment-box {
+  background: var(--theme-bg-secondary);
+  border: 1px solid var(--theme-border);
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+}
+.payment-box h3 {
+  margin-bottom: 15px;
+  color: var(--theme-text-primary);
+}
+.bank-info {
+  background: var(--theme-bg-tertiary);
+  padding: 15px;
+  border-radius: 10px;
+  border: 1px dashed var(--theme-border);
+  margin-bottom: 15px;
+}
+.bank-name {
+  color: var(--theme-text-secondary);
+  font-size: 0.9rem;
+  margin-bottom: 5px;
+}
+.bank-number {
+  font-family: 'Courier New', monospace;
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: var(--theme-text-primary);
+  letter-spacing: 1px;
+  direction: ltr; /* Ensure numbers display left-to-right */
+}
+.payment-instruction {
+  font-size: 0.85rem;
+  color: var(--theme-text-secondary);
+  margin-top: 15px;
+  line-height: 1.5;
+}
+.pay-btn {
+  background: var(--theme-accent-gradient);
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 25px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 15px;
+  transition: transform 0.2s;
+}
+.pay-btn:hover {
+  transform: scale(1.05);
+}
+    .video-preview-container {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    
+    .video-preview-item {
+      text-align: center;
+    }
+    
+    .video-preview-icon {
+      width: 80px;
+      height: 80px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      margin: 0 auto 8px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+    }
+    
+    .video-preview-label {
+      color: var(--theme-text-secondary);
+      font-size: 0.8rem;
+    }
+    
+    .pfp-preview-container {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    
+    .pfp-preview-item {
+      text-align: center;
+    }
+    
+    .pfp-preview-img {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid var(--theme-accent);
+      margin-bottom: 8px;
+    }
+    
+    .pfp-preview-label {
+      color: var(--theme-text-secondary);
+      font-size: 0.8rem;
+    }
+    
+    .pfp-preview-img.gif {
+      border-color: #f093fb;
+    }
+    
+    .pfp-preview-img.video {
+      border-color: #f5576c;
+    }
+  </style>
+</head>
+<body>
+    <div class="layout-container">
+        <aside class="sidebar mobile-hidden">
+            <div class="sidebar-header-main">
+                <div class="back-btn">
+                    <a href="/">← back</a>
+                </div>
+                <div class="user-profile"  onclick="window.location.href='./index.html'">
+                    <img src="./pictures/user.png" alt="User Avatar" class="avatar">
+                    <div class="user-info">
+                        <span class="username">Loading...</span>
+                        <span class="handle">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Search settings..." class="search-input">
+            </div>
+            <nav class="settings-nav">
+                <ul>
+                    <li class="nav-item">
+                        <a href="./Account.html" class="nav-link">
+                            <svg viewBox="0 0 24 24" fill="none" class="nav-svg">
+                                <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Account
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="./Security and Privacy.html" class="nav-link">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-svg">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            </svg>
+                            Security & Privacy
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="./screen-time.html" class="nav-link">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-svg">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                            Screen Time
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="./Notifications.html" class="nav-link">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-svg">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                            </svg>
+                            Notifications
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#display" class="nav-link">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-svg">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                <line x1="8" y1="21" x2="16" y2="21"></line>
+                                <line x1="12" y1="17" x2="12" y2="21"></line>
+                            </svg>
+                            Display & Theme
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="./settings.html" class="nav-link">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-svg">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                            </svg>
+                            Settings
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#additional" class="nav-link">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-svg">
+                            <circle cx="12" cy="12" r="10" stroke-width="1.5" />
+                            <ellipse cx="12" cy="12" rx="4" ry="10" stroke-width="1.5" />
+                            <line x1="2" y1="12" x2="22" y2="12" stroke-width="1.5" />
+                            </svg>
+                            Language
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <button class="btn-logout">Sign Out</button>
+            </div>
+        </aside>
+        <div class="main-content">
+            <header class="mobile-header">
+                <div class="mobile-header-top">
+                    <a href="./settings.html" class="back-btn">
+                        <h1>← Premium</h1>
+                    </a>
+                </div>
+            </header>
+          <!-- Locked State -->
+          <div id="premiumLocked" class="premium-container" style="display: none;">
+            <div class="premium-hero">
+              <h1>✨ Premium Features</h1>
+              <p>Unlock the full potential of Cybers/ash with our premium features</p>
+              <div class="premium-badge">🔒 Premium Only</div>
+            </div>
+            <!-- Feature 1: Group Chats -->
+            <div class="feature-card">
+              <div class="feature-header">
+                <div class="feature-icon group">👥</div>
+                <div class="feature-title">Group Chats (Up to 10 Members)</div>
+              </div>
+              <div class="feature-desc">
+                Create group chats with up to 10 members in your DMs. Perfect for friends, teams, or communities.
+              </div>
+              <div class="preview-box">
+                <span class="preview-label">PREVIEW</span>
+                <div class="group-preview">
+                  <div class="group-preview-header">
+                    <div class="group-avatar-preview">G</div>
+                    <div class="group-info-preview">
+                      <h4>Game Night Squad</h4>
+                      <span>8 members • 3 online</span>
+                    </div>
+                  </div>
+                  <div class="group-members-preview">
+                    <div class="member-avatar" style="background: #667eea;"></div>
+                    <div class="member-avatar" style="background: #f093fb;"></div>
+                    <div class="member-avatar" style="background: #38ef7d;"></div>
+                    <div class="member-avatar" style="background: #f5576c;"></div>
+                    <div class="member-avatar" style="background: #00c6ff;"></div>
+                    <div class="member-count">+3</div>
+                  </div>
+                </div>
+              </div>
+              <div class="coming-soon">🚀 Coming Soon</div>
+            </div>
+            <!-- Feature 2: Theme Selection -->
+            <div class="feature-card">
+              <div class="feature-header">
+                <div class="feature-icon theme">🎨</div>
+                <div class="feature-title">Custom Themes & Gradients</div>
+              </div>
+              <div class="feature-desc">
+                Personalize your app with beautiful dark-theme gradient colors. Click a theme to preview!
+              </div>
+              <div class="preview-box">
+                <span class="preview-label">PREVIEW</span>
+                <div class="theme-preview-grid" id="lockedThemeGrid">
+                  <div class="theme-preview-item theme-default" data-theme="theme-default" style="background: linear-gradient(135deg, #000 0%, #1a1a1a 100%);" title="Default"></div>
+                  <div class="theme-preview-item theme-discord" data-theme="theme-discord" style="background: linear-gradient(135deg, #36393f 0%, #2f3136 100%);" title="Discord"></div>
+                  <div class="theme-preview-item theme-amethyst" data-theme="theme-amethyst" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);" title="Amethyst"></div>
+                  <div class="theme-preview-item theme-aurora" data-theme="theme-aurora" style="background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);" title="Aurora"></div>
+                  <div class="theme-preview-item theme-sunset" data-theme="theme-sunset" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);" title="Sunset"></div>
+                  <div class="theme-preview-item theme-forest" data-theme="theme-forest" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);" title="Forest"></div>
+                  <div class="theme-preview-item theme-ocean" data-theme="theme-ocean" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);" title="Ocean"></div>
+                  <div class="theme-preview-item theme-midnight" data-theme="theme-midnight" style="background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);" title="Midnight"></div>
+                  <div class="theme-preview-item theme-fire" data-theme="theme-fire" style="background: linear-gradient(135deg, #f12711 0%, #f5af19 100%);" title="Fire"></div>
+                </div>
+                <div class="preview-note">
+                  <strong>Click a theme to preview!</strong> Theme resets when you reload.
+                </div>
+              </div>
+              <div class="coming-soon">🚀 Coming Soon</div>
+            </div>
+            <!-- Feature 3: Custom Background -->
+            <div class="feature-card">
+              <div class="feature-header">
+                <div class="feature-icon bg">🖼️</div>
+                <div class="feature-title">Custom Background Image</div>
+              </div>
+              <div class="feature-desc">
+                Choose a background image for your app. Click to preview!
+              </div>
+              <div class="preview-box">
+                <span class="preview-label">PREVIEW</span>
+                <div class="bg-preview-grid" id="lockedBgGrid">
+                  <div class="bg-preview-item" data-bg="none" style="background: #000; cursor: default;" title="No Background">
+                    <span style="position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); color: #666; font-size: 0.7rem;">🚫 None</span>
+                  </div>
+                  <div class="bg-preview-item" data-bg="gradient1" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);" title="Purple Dream"></div>
+                  <div class="bg-preview-item" data-bg="gradient2" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);" title="Sunset Glow"></div>
+                  <div class="bg-preview-item" data-bg="gradient3" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);" title="Forest Green"></div>
+                  <div class="bg-preview-item" data-bg="gradient4" style="background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);" title="Ocean Blue"></div>
+                  <div class="bg-preview-item" data-bg="gradient5" style="background: linear-gradient(135deg, #f12711 0%, #f5af19 100%);" title="Fire Storm"></div>
+                  <div class="bg-preview-item" data-bg="gradient6" style="background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%);" title="Pink Sunset"></div>
+                  <div class="bg-preview-item" data-bg="gradient7" style="background: linear-gradient(135deg, #0f0c29 0%, #302b63 100%);" title="Midnight Purple"></div>
+                </div>
+                <div class="preview-note">
+                  <strong>Click a background to preview!</strong> Resets when you reload.
+                </div>
+              </div>
+              <div class="coming-soon">🚀 Coming Soon</div>
+            </div>
+            <!-- Feature 4: Video Posts -->
+            <div class="feature-card">
+              <div class="feature-header">
+                <div class="feature-icon video">🎥</div>
+                <div class="feature-title">Video Posts & Stories</div>
+              </div>
+              <div class="feature-desc">
+                Share your moments with video posts and stories. Upload videos directly to your profile or feed.
+              </div>
+              <div class="preview-box">
+                <span class="preview-label">PREVIEW</span>
+                <div class="video-preview-container">
+                  <div class="video-preview-item">
+                    <div class="video-preview-icon post">▶</div>
+                    <div class="video-preview-label">Post Video</div>
+                  </div>
+                  <div class="video-preview-item">
+                    <div class="video-preview-icon" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); border-radius: 50%;">👁</div>
+                    <div class="video-preview-label">Story</div>
+                  </div>
+                </div>
+              </div>
+              <div class="coming-soon">🚀 Coming Soon</div>
+            </div>
+
+            <!-- Feature 5: GIF & Video PFP -->
+            <div class="feature-card">
+              <div class="feature-header">
+                <div class="feature-icon pfp">🖼️</div>
+                <div class="feature-title">GIF & Video Profile Pictures</div>
+              </div>
+              <div class="feature-desc">
+                Make your profile stand out by setting a GIF as your profile picture.
+              </div>
+              <div class="preview-box">
+                <span class="preview-label">PREVIEW</span>
+                <div class="pfp-preview-container">
+                  <div class="pfp-preview-item">
+                    <img src="https://via.placeholder.com/80/667eea/ffffff?text=GIF" alt="GIF PFP" class="pfp-preview-img gif">
+                    <div class="pfp-preview-label">GIF</div>
+                  </div>
+                </div>
+              </div>
+              <div class="coming-soon">🚀 Coming Soon</div>
+            </div>
+            <!-- Payment Options -->
+            <div class="premium-payment-section">
+              <h3 style="text-align: center; margin-bottom: 20px; color: var(--theme-text-primary);">Choose a Plan</h3>
+              
+              <div class="pricing-grid">
+                <!-- 1 Month -->
+                <div class="pricing-card" onclick="selectPlan(this, '1 Month')">
+                  <div class="pricing-duration">1 Month</div>
+                  <div class="pricing-price">80,000 T</div>
+                  <div class="pricing-desc">Basic access</div>
+                </div>
+                
+                <!-- 3 Months -->
+                <div class="pricing-card" onclick="selectPlan(this, '3 Months')">
+                  <div class="pricing-duration">3 Months</div>
+                  <div class="pricing-price">160,000 T</div>
+                  <div class="pricing-desc">Save 17%</div>
+                </div>
+                
+                <!-- 12 Months -->
+                <div class="pricing-card" onclick="selectPlan(this, '12 Months')">
+                  <div class="pricing-duration">1 Year</div>
+                  <div class="pricing-price">720,000 T</div>
+                  <div class="pricing-desc">Best Value</div>
+                </div>
+              </div>
+
+              <!-- Bank Details -->
+              <div class="payment-box">
+                <h3>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-right: 5px;">
+                    <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 10H22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M6 15H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  Payment Details
+                </h3>
+                <div class="bank-info">
+                  <div class="bank-name">Recipient Name:</div>
+                  <div style="color: var(--theme-text-primary); font-weight: bold; margin-bottom: 10px;">Ali Ahmadabadi</div>
+                  
+                  <div class="bank-name">Card Number:</div>
+                  <div class="bank-number">6037-7012-1325-9366</div>
+                </div>
+                
+                <div class="payment-instruction">
+                  1. Send payment to the number above.<br>
+                  2. Take a screenshot of the receipt.<br>
+                  3. Send the screenshot to support via Rubika (web.rubika.ir) to @cyberslash.
+                </div>
+
+                <button class="pay-btn" onclick="alert('Please send your payment receipt to @cyberslash on Rubika (web.rubika.ir) to activate your premium.')">
+                  I Have Paid
+                </button>
+              </div>
+            </div>
+            <div class="premium-footer">
+              <p>More premium features coming soon!</p>
+            </div>
+          </div>
+          
+          <!-- Premium Features -->
+          <div id="premiumFeatures" class="premium-container" style="display: none;">
+            <div class="premium-hero">
+              <h1>✨ Premium Features</h1>
+              <p>Customize your experience with premium features</p>
+              <div class="premium-badge">🌟 Premium Active</div>
+            </div>
+            
+            <!-- Theme Selection -->
+            <div class="feature-card">
+              <div class="feature-header">
+                <div class="feature-icon theme">🎨</div>
+                <div class="feature-title">Custom Theme</div>
+              </div>
+              <div class="feature-desc">
+                Choose a theme color for your app interface.
+              </div>
+              <div class="preview-box">
+                <span class="preview-label">SELECT THEME</span>
+                <div class="theme-preview-grid" id="premiumThemeGrid">
+                  <div class="theme-preview-item theme-default" data-theme="theme-default" style="background: linear-gradient(135deg, #000 0%, #1a1a1a 100%);" title="Default"></div>
+                  <div class="theme-preview-item theme-discord" data-theme="theme-discord" style="background: linear-gradient(135deg, #36393f 0%, #2f3136 100%);" title="Discord"></div>
+                  <div class="theme-preview-item theme-amethyst" data-theme="theme-amethyst" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);" title="Amethyst"></div>
+                  <div class="theme-preview-item theme-aurora" data-theme="theme-aurora" style="background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);" title="Aurora"></div>
+                  <div class="theme-preview-item theme-sunset" data-theme="theme-sunset" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);" title="Sunset"></div>
+                  <div class="theme-preview-item theme-forest" data-theme="theme-forest" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);" title="Forest"></div>
+                  <div class="theme-preview-item theme-ocean" data-theme="theme-ocean" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);" title="Ocean"></div>
+                  <div class="theme-preview-item theme-midnight" data-theme="theme-midnight" style="background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);" title="Midnight"></div>
+                  <div class="theme-preview-item theme-fire" data-theme="theme-fire" style="background: linear-gradient(135deg, #f12711 0%, #f5af19 100%);" title="Fire"></div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Background Selection -->
+            <div class="feature-card">
+              <div class="feature-header">
+                <div class="feature-icon bg">🖼️</div>
+                <div class="feature-title">Custom Background</div>
+              </div>
+              <div class="feature-desc">
+                Choose a background gradient or upload your own image for your app.
+              </div>
+              <div class="preview-box">
+                <span class="preview-label">SELECT BACKGROUND</span>
+                
+                <!-- Gradient Options -->
+                <div class="bg-preview-grid" id="premiumBgGrid">
+                  <div class="bg-preview-item" data-bg="none" style="background: #000; cursor: default;" title="No Background">
+                    <span style="position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); color: #666; font-size: 0.7rem;">🚫 None</span>
+                  </div>
+                  <div class="bg-preview-item" data-bg="gradient1" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);" title="Purple Dream"></div>
+                  <div class="bg-preview-item" data-bg="gradient2" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);" title="Sunset Glow"></div>
+                  <div class="bg-preview-item" data-bg="gradient3" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);" title="Forest Green"></div>
+                  <div class="bg-preview-item" data-bg="gradient4" style="background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);" title="Ocean Blue"></div>
+                  <div class="bg-preview-item" data-bg="gradient5" style="background: linear-gradient(135deg, #f12711 0%, #f5af19 100%);" title="Fire Storm"></div>
+                  <div class="bg-preview-item" data-bg="gradient6" style="background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%);" title="Pink Sunset"></div>
+                  <div class="bg-preview-item" data-bg="gradient7" style="background: linear-gradient(135deg, #0f0c29 0%, #302b63 100%);" title="Midnight Purple"></div>
+                </div>
+                
+                <!-- Custom Upload Section -->
+                <div class="custom-bg-upload">
+                  <label for="customBgInput" class="custom-bg-label">
+                    <span>📁 Upload Custom Image</span>
+                    <input type="file" id="customBgInput" accept="image/*" style="display: none;">
+                  </label>
+                  <div id="customBgPreview" class="custom-bg-preview" style="display: none;">
+                    <img id="customBgImg" src="" alt="Custom Background">
+                    <button type="button" id="removeCustomBg" class="remove-bg-btn">✕</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <button id="saveAllBtn" class="save-settings-btn" onclick="saveAllSettings()">
+              💾 Save All Settings
+            </button>
+            <div id="saveMessage" class="save-message"></div>
+            <p><i>© Cyberslash® LLC. 2026, All rights reserved.</i></p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+<script src="settings-utils.js"></script>
+    
+
+  
+  <script>
+    // Global variables
+    let currentSessionUsername = "";
+    let csrfToken = "";
+    let isPremiumUser = false;
+    let selectedTheme = "theme-default";
+    let selectedBackground = "none";
+    let currentBg = null;
+    let customBgUrl = null;
+
+    // Gradient definitions
+    const gradients = {
+      'gradient1': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      'gradient2': 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+      'gradient3': 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+      'gradient4': 'linear-gradient(135deg, #00c6ff 0%, #0072ff 100%)',
+      'gradient5': 'linear-gradient(135deg, #f12711 0%, #f5af19 100%)',
+      'gradient6': 'linear-gradient(135deg, #ee0979 0%, #ff6a00 100%)',
+      'gradient7': 'linear-gradient(135deg, #0f0c29 0%, #302b63 100%)'
+    };
+
+    // Theme switching function
+    function applyTheme(themeName) {
+      document.body.classList.remove(
+        'theme-default', 'theme-discord', 'theme-amethyst',
+        'theme-aurora', 'theme-sunset', 'theme-forest',
+        'theme-ocean', 'theme-midnight', 'theme-fire'
+      );
+      if (themeName) {
+        document.body.classList.add(themeName);
+      }
+      selectedTheme = themeName;
+      document.querySelectorAll('.theme-preview-grid').forEach(grid => {
+        grid.querySelectorAll('.theme-preview-item').forEach(item => {
+          if (item.dataset.theme === themeName) {
+            item.classList.add('active');
+          } else {
+            item.classList.remove('active');
+          }
+        });
+      });
+    }
+
+    // Background switching function
+    function applyBackground(bgName, isCustom, customUrl) {
+      console.log("[BG] Applying background:", bgName, "isCustom:", isCustom, "url:", customUrl);
+      
+      // Reset background
+      document.body.style.background = '';
+      document.body.style.backgroundImage = '';
+      
+      if (isCustom && customUrl) {
+        document.body.style.backgroundImage = `url('${customUrl}')`;
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundPosition = 'center';
+        document.body.style.backgroundRepeat = 'no-repeat';
+        customBgUrl = customUrl;
+        selectedBackground = 'custom';
+        
+        // Enable transparency for custom backgrounds
+        updateTransparency(true);
+      } else if (bgName && bgName !== 'none' && gradients[bgName]) {
+        document.body.style.backgroundImage = gradients[bgName];
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundPosition = 'center';
+        document.body.style.backgroundRepeat = 'no-repeat';
+        currentBg = bgName;
+        customBgUrl = null;
+        selectedBackground = bgName;
+        
+        // Disable transparency for gradients (optional - remove if you want gradients to also have transparency)
+        updateTransparency(false);
+      } else {
+        currentBg = null;
+        customBgUrl = null;
+        selectedBackground = 'none';
+        
+        // Disable transparency when no background
+        updateTransparency(false);
+      }
+
+      // Update UI
+      document.querySelectorAll('.bg-preview-grid').forEach(grid => {
+        grid.querySelectorAll('.bg-preview-item').forEach(item => {
+          if (!isCustom && item.dataset.bg === bgName) {
+            item.classList.add('active');
+          } else {
+            item.classList.remove('active');
+          }
+        });
+      });
+    }
+
+    // Setup theme listeners
+    function setupThemeListeners() {
+      document.querySelectorAll('.theme-preview-grid').forEach(grid => {
+        grid.querySelectorAll('.theme-preview-item').forEach(item => {
+          item.addEventListener('click', function() {
+            applyTheme(this.dataset.theme);
+          });
+        });
+      });
+    }
+
+    // Setup background listeners
+    function setupBackgroundListeners() {
+      document.querySelectorAll('.bg-preview-grid').forEach(grid => {
+        grid.querySelectorAll('.bg-preview-item').forEach(item => {
+          item.addEventListener('click', function() {
+            applyBackground(this.dataset.bg, false, null);
+          });
+        });
+      });
+    }
+
+    // Setup custom background upload
+    function setupCustomBgUpload() {
+      const fileInput = document.getElementById('customBgInput');
+      const preview = document.getElementById('customBgPreview');
+      const previewImg = document.getElementById('customBgImg');
+      const removeBtn = document.getElementById('removeCustomBg');
+
+      if (!fileInput) return;
+
+      fileInput.addEventListener('change', async function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+          alert('Please select an image file');
+          return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+          alert('Image must be less than 5MB');
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('background', file);
+
+        try {
+          const res = await fetch('/upload-background', {
+            method: 'POST',
+            headers: {
+              'X-CSRF-Token': csrfToken
+            },
+            credentials: 'include',
+            body: formData
+          });
+
+          if (!res.ok) throw new Error('Upload failed');
+
+          const data = await res.json();
+          
+          previewImg.src = data.backgroundImage;
+          preview.style.display = 'inline-block';
+          
+          applyBackground(null, true, data.backgroundImage);
+          
+        } catch (err) {
+          console.error('Upload error:', err);
+          alert('Failed to upload background');
+        }
+      });
+
+      if (removeBtn) {
+        removeBtn.addEventListener('click', function() {
+          preview.style.display = 'none';
+          previewImg.src = '';
+          applyBackground('none', false, null);
+        });
+      }
+    }
+
+    // Auth check
+    function checkAuth() {
+      return fetch("/session", { credentials: "include" })
+        .then(res => {
+          if (!res.ok) throw new Error("Not logged in");
+          return res.json();
+        })
+        .then(user => {
+          currentSessionUsername = user.username;
+          console.log("[AUTH] Logged in as:", user.username);
+          return fetch(`/api/user-info/${encodeURIComponent(user.username)}`, { credentials: "include" });
+        })
+        .then(res => res.json())
+        .then(userData => {
+          console.log("[AUTH] User data:", userData);
+          
+          isPremiumUser = userData.isPremium === true;
+          console.log("[AUTH] Is premium:", isPremiumUser);
+          
+          if (isPremiumUser) {
+            document.getElementById("premiumFeatures").style.display = "block";
+            document.getElementById("premiumLocked").style.display = "none";
+            
+            // Load saved theme
+            if (userData.theme) {
+              applyTheme(userData.theme);
+            }
+            
+            // Load saved background
+            if (userData.backgroundImage) {
+              console.log("[AUTH] Saved background:", userData.backgroundImage);
+              if (userData.backgroundImage.startsWith('/backgrounds/') || 
+                  userData.backgroundImage.startsWith('storage/backgrounds/') ||
+                  userData.backgroundImage.startsWith('storage/')) {
+                
+                // It's a custom uploaded image
+                let bgUrl = userData.backgroundImage;
+                if (!bgUrl.startsWith('/')) {
+                  bgUrl = '/' + bgUrl;
+                }
+                
+                applyBackground(null, true, bgUrl);
+                
+                const preview = document.getElementById('customBgPreview');
+                const previewImg = document.getElementById('customBgImg');
+                if (preview && previewImg) {
+                  previewImg.src = bgUrl;
+                  preview.style.display = 'inline-block';
+                }
+              } else if (userData.backgroundImage.startsWith('gradient')) {
+                applyBackground(userData.backgroundImage, false, null);
+              }
+            }
+          } else {
+            document.getElementById("premiumFeatures").style.display = "none";
+            document.getElementById("premiumLocked").style.display = "block";
+          }
+        })
+        .catch(err => {
+          console.error("[AUTH] Error:", err);
+          window.location.href = "/index.html";
+        });
+    }
+
+    // Save all settings
+    async function saveAllSettings() {
+      const btn = document.getElementById("saveAllBtn");
+      const msg = document.getElementById("saveMessage");
+      btn.disabled = true;
+      btn.textContent = "Saving...";
+
+      try {
+        const bgToSave = selectedBackground === 'custom' ? customBgUrl : selectedBackground;
+        
+        const res = await fetch("/api/user-settings", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            theme: selectedTheme,
+            backgroundImage: bgToSave
+          })
+        });
+
+        if (res.ok) {
+          msg.textContent = "✅ Settings saved successfully!";
+          msg.className = "save-message success";
+        } else {
+          throw new Error("Failed to save");
+        }
+      } catch (err) {
+        console.error("Save error:", err);
+        msg.textContent = "❌ Failed to save settings";
+        msg.className = "save-message error";
+      }
+
+      btn.disabled = false;
+      btn.textContent = "💾 Save All Settings";
+      setTimeout(() => {
+        msg.className = "save-message";
+      }, 3000);
+    }
+
+    // Initialize
+    document.addEventListener("DOMContentLoaded", function() {
+      fetch("/csrf-token")
+        .then(r => r.json())
+        .then(d => {
+          csrfToken = d.csrfToken;
+          setupThemeListeners();
+          setupBackgroundListeners();
+          setupCustomBgUpload();
+          checkAuth();
+        })
+        .catch(err => console.error("Init error:", err));
+    });
+
+    // Function to toggle transparency based on background type
+    function updateTransparency(isCustomBg) {
+      if (isCustomBg) {
+        document.body.classList.add('has-custom-bg');
+        console.log("[TRANSPARENCY] Enabled for custom background");
+      } else {
+        document.body.classList.remove('has-custom-bg');
+        console.log("[TRANSPARENCY] Disabled");
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            // 1. Fetch session data
+            const response = await fetch('/session');
+            
+            if (!response.ok) {
+                console.log("User not logged in");
+                return;
+            }
+            
+            const data = await response.json();
+            
+            // 2. Check if user exists and has a pfp
+            if (data.pfp) {
+                // Ensure path starts with a slash
+                const pfpSrc = data.pfp.startsWith('/') ? data.pfp : '/' + data.pfp;
+                
+                // 3. Update BOTH images
+                const desktopImg = document.getElementById('accountPfp');
+                const mobileImg = document.getElementById('mobileaccountPfp');
+
+                if (desktopImg) {
+                    desktopImg.src = pfpSrc;
+                }
+                
+                if (mobileImg) {
+                    mobileImg.src = pfpSrc;
+                }
+            } else {
+                // Optional: Set a default avatar if no pfp is uploaded
+                const desktopImg = document.getElementById('accountPfp');
+                const mobileImg = document.getElementById('mobileaccountPfp');
+                const defaultAvatar = '/default-avatar.png'; // Ensure you have this file or handle it in CSS
+
+                if (desktopImg) desktopImg.src = defaultAvatar;
+                if (mobileImg) mobileImg.src = defaultAvatar;
+            }
+        } catch (error) {
+            console.error("Error fetching session:", error);
+        }
+    });
+// Function to handle plan selection
+let selectedPlan = null;
+
+function selectPlan(element, planName) {
+  // Remove selected class from all cards
+  document.querySelectorAll('.pricing-card').forEach(card => {
+    card.classList.remove('selected');
+  });
+  
+  // Add selected class to clicked card
+  element.classList.add('selected');
+  selectedPlan = planName;
+  
+  console.log("Selected plan:", selectedPlan);
+}
+  </script>
+  <script src="./global-tracking.js"></script>
+</body>
+</html>

@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+    (function() {
+      const savedTheme = localStorage.getItem('userTheme');
+      const savedBg = localStorage.getItem('userBackground');
+      if (savedTheme) document.body.classList.add(savedTheme);
+      if (savedBg) {
+        document.body.style.backgroundImage = savedBg;
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundAttachment = 'fixed';
+      }
+    })();
+  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no"/>
+  <title>CyberBites - Cybers/ash</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./index.css">
+  <style>
+    /* CyberBites Specific Styles */
+    .cyberbites-container {
+      max-width: 500px;
+      margin: 0 auto;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: #000;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cyberbites-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .cyberbites-header h1 {
+      font-size: 1.5rem;
+      font-weight: bold;
+      background: linear-gradient(135deg, #667eea, #764ba2, #f093fb);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin: 0;
+    }
+
+    .cyberbites-header button {
+      pointer-events: auto;
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      backdrop-filter: blur(10px);
+    }
+
+    .cyberbites-feed {
+      flex: 1;
+      overflow-y: scroll;
+      scroll-snap-type: y mandatory;
+      height: 100vh;
+      scroll-behavior: smooth;
+    }
+
+    .cyberbites-feed::-webkit-scrollbar {
+      display: none;
+    }
+
+    .cyberbite-item {
+      scroll-snap-align: start;
+      height: 100vh;
+      width: 100%;
+      position: relative;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cyberbite-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    .cyberbite-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+      padding: 20px;
+      color: white;
+    }
+
+    .cyberbite-user {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .cyberbite-user-pfp {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid var(--theme-accent);
+    }
+
+    .cyberbite-username {
+      font-weight: bold;
+      font-size: 1rem;
+    }
+
+    .cyberbite-caption {
+      font-size: 0.9rem;
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+
+    .cyberbite-stats {
+      display: flex;
+      gap: 20px;
+      font-size: 0.8rem;
+      color: #ccc;
+    }
+
+    .cyberbite-stats span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .cyberbite-actions {
+      position: absolute;
+      right: 10px;
+      bottom: 100px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      z-index: 10;
+    }
+
+    .cyberbite-action-btn {
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(5px);
+      border: none;
+      border-radius: 50%;
+      width: 45px;
+      height: 45px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.2s;
+      color: white;
+    }
+
+    .cyberbite-action-btn:hover {
+      transform: scale(1.1);
+    }
+
+    .cyberbite-action-btn.liked {
+      color: #ef4444;
+    }
+
+    .cyberbite-action-btn.saved {
+      color: #fbbf24;
+    }
+
+    .cyberbite-action-count {
+      font-size: 0.7rem;
+      margin-top: 5px;
+      text-align: center;
+    }
+
+    /* Navigation Arrows */
+    .nav-arrows {
+      position: fixed;
+      right: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      z-index: 50;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .cyberbites-container:hover .nav-arrows {
+      opacity: 1;
+    }
+
+    @media (max-width: 768px) {
+      .nav-arrows {
+        opacity: 0.5;
+        right: 10px;
+      }
+      .cyberbites-container:hover .nav-arrows {
+        opacity: 0.5;
+      }
+    }
+
+    .nav-arrow {
+      width: 40px;
+      height: 40px;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(10px);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .nav-arrow:hover {
+      transform: scale(1.1);
+      background: rgba(0, 0, 0, 0.8);
+    }
+
+    .nav-arrow.disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .nav-arrow.disabled:hover {
+      transform: none;
+      background: rgba(0, 0, 0, 0.6);
+    }
+
+    .nav-arrow svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: white;
+      stroke-width: 2;
+    }
+
+    .upload-modal {
+      position: fixed;
+      bottom: -100%;
+      left: 0;
+      right: 0;
+      background: var(--theme-bg-secondary);
+      border-radius: 20px 20px 0 0;
+      padding: 20px;
+      z-index: 200;
+      transition: bottom 0.3s ease;
+      border-top: 1px solid var(--theme-border);
+    }
+
+    .upload-modal.show {
+      bottom: 0;
+    }
+
+    .upload-modal h3 {
+      margin-bottom: 15px;
+    }
+
+    .upload-modal input, .upload-modal textarea {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: var(--theme-bg-tertiary);
+      border: 1px solid var(--theme-border);
+      border-radius: 10px;
+      color: var(--theme-text-primary);
+    }
+
+    .upload-modal textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .upload-limit-info {
+      background: var(--theme-bg-tertiary);
+      padding: 10px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      font-size: 0.85rem;
+    }
+
+    .upload-btn {
+      background: var(--theme-accent);
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 25px;
+      width: 100%;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .close-modal {
+      position: absolute;
+      top: 10px;
+      right: 20px;
+      background: none;
+      border: none;
+      color: var(--theme-text-secondary);
+      font-size: 24px;
+      cursor: pointer;
+    }
+
+    .loading-spinner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: var(--theme-accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+      color: var(--theme-text-secondary);
+      padding: 20px;
+    }
+
+    .empty-state svg {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 20px;
+      opacity: 0.5;
+    }
+
+    @media (max-width: 768px) {
+      .cyberbite-actions {
+        bottom: 80px;
+      }
+      .cyberbite-action-btn {
+        width: 40px;
+        height: 40px;
+      }
+    }
+
+    .admin-badge {
+      background: #ffd700;
+      color: #000;
+      font-size: 0.6rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 5px;
+      font-weight: bold;
+    }
+
+    .cyberbite-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      position: absolute;
+      top: 0;
+      left: 0;
+      background: #000;
+    }
+
+    .cyberbite-item {
+      scroll-snap-align: start;
+      height: 100vh;
+      width: 100%;
+      position: relative;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* Play/Pause Indicator */
+    .play-pause-indicator {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    border-radius: 50%;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    animation: fadeInOut 0.5s ease forwards;
+    pointer-events: none;
+    }
+
+    .play-pause-indicator svg {
+    width: 48px;
+    height: 48px;
+    }
+
+    @keyframes fadeInOut {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+    20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
+    }
+
+  </style>
+</head>
+<body>
+  <div class="cyberbites-container">
+    <div class="cyberbites-header">
+      <h1>⚡ CyberBites</h1>
+      <button id="uploadShortBtn">+ Upload</button>
+    </div>
+
+    <!-- Navigation Arrows -->
+    <div class="nav-arrows" id="navArrows">
+      <div class="nav-arrow" id="navUp" onclick="navigateUp()">
+        <svg viewBox="0 0 24 24">
+          <path d="M7 14l5-5 5 5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="nav-arrow" id="navDown" onclick="navigateDown()">
+        <svg viewBox="0 0 24 24">
+          <path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <div id="cyberbitesFeed" class="cyberbites-feed">
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+        </svg>
+        <p>No CyberBites yet!</p>
+        <p style="font-size: 0.8rem; margin-top: 10px;">Upload short vertical videos to get started</p>
+      </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div id="uploadModal" class="upload-modal">
+      <button class="close-modal" onclick="closeUploadModal()">&times;</button>
+      <h3>Upload CyberBite</h3>
+      <div id="uploadLimitInfo" class="upload-limit-info">
+        Loading your upload limits...
+      </div>
+      <input type="file" id="cyberbiteVideo" accept="video/*" capture>
+      <textarea id="cyberbiteCaption" placeholder="Write a caption... (max 150 chars)" maxlength="150"></textarea>
+      <button class="upload-btn" onclick="uploadCyberBite()">Upload</button>
+    </div>
+  </div>
+
+  <script src="./index.js"></script>
+  <script src="./global-tracking.js"></script>
+  <script>
+    let currentVideoIndex = 0;
+    let cyberBites = [];
+    let userUploadStats = {
+      dailyCount: 0,
+      weeklyCount: 0,
+      lastUploadDate: null,
+      isPremium: false
+    };
+    let csrfTokenValue = null;
+    let activeVideo = null;
+    let totalVideos = 0;
+    let feedElement = null;
+
+    // Get CSRF token
+    async function getCsrfToken() {
+      try {
+        const response = await fetch('/csrf-token', { credentials: 'include' });
+        const data = await response.json();
+        csrfTokenValue = data.csrfToken;
+        return csrfTokenValue;
+      } catch (err) {
+        console.error('Failed to get CSRF token:', err);
+        return null;
+      }
+    }
+
+    // Custom fetch with CSRF for this page
+    async function cyberFetch(url, options = {}) {
+      if (!csrfTokenValue) {
+        await getCsrfToken();
+      }
+      
+      options.headers = options.headers || {};
+      options.headers['X-CSRF-Token'] = csrfTokenValue;
+      options.credentials = 'include';
+      
+      return fetch(url, options);
+    }
+
+    // Navigation functions
+    function navigateUp() {
+      if (currentVideoIndex > 0) {
+        const itemHeight = window.innerHeight;
+        feedElement.scrollTo({
+          top: (currentVideoIndex - 1) * itemHeight,
+          behavior: 'smooth'
+        });
+      }
+    }
+
+    function navigateDown() {
+      if (currentVideoIndex < totalVideos - 1) {
+        const itemHeight = window.innerHeight;
+        feedElement.scrollTo({
+          top: (currentVideoIndex + 1) * itemHeight,
+          behavior: 'smooth'
+        });
+      }
+    }
+
+    function updateArrowState() {
+      const upArrow = document.getElementById('navUp');
+      const downArrow = document.getElementById('navDown');
+      
+      if (upArrow && downArrow) {
+        if (currentVideoIndex <= 0) {
+          upArrow.classList.add('disabled');
+        } else {
+          upArrow.classList.remove('disabled');
+        }
+        
+        if (currentVideoIndex >= totalVideos - 1) {
+          downArrow.classList.add('disabled');
+        } else {
+          downArrow.classList.remove('disabled');
+        }
+      }
+    }
+
+    // Load cyberbites feed
+    async function loadCyberBites() {
+      const feed = document.getElementById('cyberbitesFeed');
+      feed.innerHTML = '<div class="loading-spinner"></div>';
+      
+      try {
+        await getCsrfToken();
+        const response = await cyberFetch('/api/cyberbites/feed');
+        const data = await response.json();
+        cyberBites = data.bites || [];
+        totalVideos = cyberBites.length;
+        
+        if (cyberBites.length === 0) {
+          feed.innerHTML = `
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+              </svg>
+              <p>No CyberBites yet!</p>
+              <p style="font-size: 0.8rem; margin-top: 10px;">Upload short vertical videos to get started</p>
+            </div>
+          `;
+          updateArrowState();
+          return;
+        }
+        
+        renderCyberBites();
+        setupYouTubeShortsScroll();
+        
+      } catch (err) {
+        console.error('Failed to load CyberBites:', err);
+        feed.innerHTML = '<div class="empty-state"><p>Failed to load CyberBites</p></div>';
+      }
+    }
+
+    function renderCyberBites() {
+      const feed = document.getElementById('cyberbitesFeed');
+      feed.innerHTML = '';
+      
+      cyberBites.forEach((bite, index) => {
+        const div = document.createElement('div');
+        div.className = 'cyberbite-item';
+        div.setAttribute('data-id', bite.id);
+        div.setAttribute('data-index', index);
+        
+        const isLiked = bite.likes && bite.likes.includes(currentSessionUsername);
+        const isSaved = bite.saves && bite.saves.includes(currentSessionUsername);
+        
+        div.innerHTML = `
+          <video class="cyberbite-video" 
+                 src="${bite.videoUrl}" 
+                 preload="metadata"
+                 playsinline
+                 muted
+                 style="width: 100%; height: 100%; object-fit: cover;">
+          </video>
+          <div class="cyberbite-overlay">
+            <div class="cyberbite-user">
+              <img src="${bite.pfp || 'favicon.ico'}" class="cyberbite-user-pfp" onerror="this.src='favicon.ico'">
+              <span class="cyberbite-username">${escapeHtml(bite.username)}</span>
+              ${bite.isPremium ? '<span class="premium-badge" style="font-size: 0.6rem;">/P</span>' : ''}
+              ${bite.isAdmin ? '<span class="admin-badge">ADMIN</span>' : ''}
+            </div>
+            <div class="cyberbite-caption">${escapeHtml(bite.caption || '')}</div>
+            <div class="cyberbite-stats">
+              <span>👁️ ${bite.views || 0}</span>
+              <span>❤️ ${bite.likes ? bite.likes.length : 0}</span>
+              <span>💬 ${bite.comments ? bite.comments.length : 0}</span>
+            </div>
+          </div>
+          <div class="cyberbite-actions">
+            <div style="text-align: center">
+              <button class="cyberbite-action-btn like-btn ${isLiked ? 'liked' : ''}" onclick="event.stopPropagation(); likeCyberBite('${bite.id}', this)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                </svg>
+              </button>
+              <div class="cyberbite-action-count">${bite.likes ? bite.likes.length : 0}</div>
+            </div>
+            <div style="text-align: center">
+              <button class="cyberbite-action-btn save-btn ${isSaved ? 'saved' : ''}" onclick="event.stopPropagation(); saveCyberBite('${bite.id}', this)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/>
+                </svg>
+              </button>
+              <div class="cyberbite-action-count">${bite.saves ? bite.saves.length : 0}</div>
+            </div>
+            <div style="text-align: center">
+              <button class="cyberbite-action-btn" onclick="event.stopPropagation(); shareCyberBite('${bite.id}')">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                  <polyline points="16 6 12 2 8 6"/>
+                  <line x1="12" y1="2" x2="12" y2="15"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        `;
+        
+        feed.appendChild(div);
+      });
+    }
+
+    function setupYouTubeShortsScroll() {
+      feedElement = document.getElementById('cyberbitesFeed');
+      const videos = document.querySelectorAll('.cyberbite-video');
+      const itemHeight = window.innerHeight;
+      totalVideos = videos.length;
+      
+      updateArrowState();
+      
+      // Preload nearby videos
+      function preloadNearbyVideos(centerIndex) {
+        videos.forEach((video, idx) => {
+          if (Math.abs(idx - centerIndex) <= 2) {
+            if (video.readyState < 2) {
+              video.load();
+            }
+          }
+        });
+      }
+      
+      // Play video at specific index
+      function playVideoAtIndex(index) {
+        if (index < 0 || index >= videos.length) return;
+        
+        // Stop current video
+        if (activeVideo && activeVideo !== videos[index]) {
+          activeVideo.pause();
+          activeVideo.currentTime = 0;
+        }
+        
+        const newVideo = videos[index];
+        if (newVideo && newVideo !== activeVideo) {
+          activeVideo = newVideo;
+          activeVideo.currentTime = 0;
+          
+          const playPromise = activeVideo.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(e => {
+              activeVideo.muted = true;
+              activeVideo.play().catch(() => {});
+            });
+          }
+          
+          // Track view
+          const biteItem = activeVideo.closest('.cyberbite-item');
+          if (biteItem) {
+            const biteId = biteItem.getAttribute('data-id');
+            trackCyberBiteView(biteId);
+          }
+          
+          preloadNearbyVideos(index);
+        }
+      }
+      
+      // Handle scroll events
+      let scrollTimer = null;
+      
+      feedElement.addEventListener('scroll', () => {
+        if (activeVideo && !activeVideo.paused) {
+          activeVideo.pause();
+        }
+        
+        if (scrollTimer) clearTimeout(scrollTimer);
+        
+        scrollTimer = setTimeout(() => {
+          const scrollTop = feedElement.scrollTop;
+          const newIndex = Math.round(scrollTop / itemHeight);
+          
+          if (newIndex !== currentVideoIndex) {
+            currentVideoIndex = newIndex;
+            updateArrowState();
+            playVideoAtIndex(currentVideoIndex);
+          } else if (activeVideo && activeVideo.paused) {
+            activeVideo.play().catch(() => {});
+          }
+        }, 100);
+      });
+      
+      // Handle touch end for mobile
+      feedElement.addEventListener('touchend', () => {
+        if (scrollTimer) clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => {
+          const scrollTop = feedElement.scrollTop;
+          const newIndex = Math.round(scrollTop / itemHeight);
+          
+          feedElement.scrollTo({
+            top: newIndex * itemHeight,
+            behavior: 'smooth'
+          });
+          
+          if (newIndex !== currentVideoIndex) {
+            currentVideoIndex = newIndex;
+            updateArrowState();
+            playVideoAtIndex(currentVideoIndex);
+          }
+        }, 50);
+      });
+      
+      // Initial play
+      setTimeout(() => {
+        playVideoAtIndex(0);
+      }, 500);
+      
+      // Handle window resize
+      window.addEventListener('resize', () => {
+        const newItemHeight = window.innerHeight;
+        feedElement.scrollTo({
+          top: currentVideoIndex * newItemHeight,
+          behavior: 'auto'
+        });
+      });
+      setupVideoControls();
+    }
+
+    async function likeCyberBite(biteId, btnElement) {
+      try {
+        await getCsrfToken();
+        const response = await cyberFetch(`/api/cyberbites/like/${biteId}`, { method: 'POST' });
+        const data = await response.json();
+        
+        const biteDiv = btnElement.closest('.cyberbite-item');
+        if (biteDiv) {
+          const likeBtn = biteDiv.querySelector('.like-btn');
+          const likeCount = biteDiv.querySelector('.cyberbite-stats span:nth-child(2)');
+          const actionCount = biteDiv.querySelector('.cyberbite-actions .cyberbite-action-count');
+          
+          if (data.liked) {
+            likeBtn.classList.add('liked');
+          } else {
+            likeBtn.classList.remove('liked');
+          }
+          likeCount.textContent = `❤️ ${data.likes}`;
+          if (actionCount) actionCount.textContent = data.likes;
+        }
+      } catch (err) {
+        console.error('Failed to like:', err);
+      }
+    }
+
+    async function saveCyberBite(biteId, btnElement) {
+      try {
+        await getCsrfToken();
+        const response = await cyberFetch(`/api/cyberbites/save/${biteId}`, { method: 'POST' });
+        const data = await response.json();
+        
+        const biteDiv = btnElement.closest('.cyberbite-item');
+        if (biteDiv) {
+          const saveBtn = biteDiv.querySelector('.save-btn');
+          const saveCounts = biteDiv.querySelectorAll('.cyberbite-action-count');
+          const saveCount = saveCounts[1];
+          
+          if (data.saved) {
+            saveBtn.classList.add('saved');
+          } else {
+            saveBtn.classList.remove('saved');
+          }
+          if (saveCount) saveCount.textContent = data.saves;
+        }
+      } catch (err) {
+        console.error('Failed to save:', err);
+      }
+    }
+
+    async function trackCyberBiteView(biteId) {
+      try {
+        await cyberFetch(`/api/cyberbites/view/${biteId}`, { method: 'POST' });
+      } catch (err) {
+        console.error('Failed to track view:', err);
+      }
+    }
+
+    function shareCyberBite(biteId) {
+      const url = `${window.location.origin}/cyberbites.html?id=${biteId}`;
+      navigator.clipboard.writeText(url).then(() => {
+        showToast('Link copied to clipboard!');
+      }).catch(() => {
+        alert('Share link: ' + url);
+      });
+    }
+
+    async function loadUploadLimits() {
+      try {
+        await getCsrfToken();
+        const response = await cyberFetch('/api/cyberbites/limits');
+        const data = await response.json();
+        userUploadStats = data;
+        
+        const limitInfo = document.getElementById('uploadLimitInfo');
+        
+        if (data.isAdmin) {
+          limitInfo.innerHTML = `
+            👑 <strong style="color: #ffd700;">ADMIN</strong> 👑<br>
+            ✨ Unlimited uploads - No daily or weekly limits! ✨
+          `;
+        } else {
+          const dailyRemaining = data.dailyLimit - data.dailyCount;
+          const weeklyRemaining = data.weeklyLimit - data.weeklyCount;
+          
+          limitInfo.innerHTML = `
+            ${data.isPremium ? '👑 Premium User' : '🎵 Free User'}<br>
+            📅 Daily: ${data.dailyCount}/${data.dailyLimit} used (${dailyRemaining} remaining)<br>
+            📆 Weekly: ${data.weeklyCount}/${data.weeklyLimit} used (${weeklyRemaining} remaining)
+          `;
+        }
+        
+        return data;
+      } catch (err) {
+        console.error('Failed to load limits:', err);
+        return null;
+      }
+    }
+
+    async function uploadCyberBite() {
+      const videoInput = document.getElementById('cyberbiteVideo');
+      const caption = document.getElementById('cyberbiteCaption').value;
+      const file = videoInput.files[0];
+      
+      if (!file) {
+        alert('Please select a video file');
+        return;
+      }
+      
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.onloadedmetadata = function() {
+        window.URL.revokeObjectURL(video.src);
+        if (video.duration > 60) {
+          alert('Video must be 60 seconds or less for CyberBites!');
+          return;
+        }
+        doUpload(file, caption);
+      };
+      video.src = URL.createObjectURL(file);
+    }
+    
+    async function doUpload(file, caption) {
+      const limits = await loadUploadLimits();
+      if (!limits) return;
+      
+      if (!limits.isAdmin) {
+        const dailyRemaining = limits.dailyLimit - limits.dailyCount;
+        const weeklyRemaining = limits.weeklyLimit - limits.weeklyCount;
+        
+        if (dailyRemaining <= 0) {
+          alert(`You've reached your daily upload limit (${limits.dailyLimit}/${limits.dailyLimit}). Premium users get 5 per day!`);
+          return;
+        }
+        if (weeklyRemaining <= 0) {
+          alert(`You've reached your weekly upload limit (${limits.weeklyLimit}/${limits.weeklyLimit}). Premium users get 15 per week!`);
+          return;
+        }
+      }
+      
+      const formData = new FormData();
+      formData.append('video', file);
+      formData.append('caption', caption);
+      
+      const uploadBtn = document.querySelector('.upload-btn');
+      uploadBtn.disabled = true;
+      uploadBtn.textContent = 'Uploading...';
+      
+      try {
+        await getCsrfToken();
+        const response = await cyberFetch('/api/cyberbites/upload', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (response.ok) {
+          showToast('CyberBite uploaded successfully!');
+          closeUploadModal();
+          document.getElementById('cyberbiteVideo').value = '';
+          document.getElementById('cyberbiteCaption').value = '';
+          loadCyberBites();
+          loadUploadLimits();
+        } else {
+          const error = await response.json();
+          alert(error.error || 'Upload failed');
+        }
+      } catch (err) {
+        alert('Upload failed: ' + err.message);
+      } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = 'Upload';
+      }
+    }
+
+    function openUploadModal() {
+      document.getElementById('uploadModal').classList.add('show');
+      loadUploadLimits();
+    }
+
+    function closeUploadModal() {
+      document.getElementById('uploadModal').classList.remove('show');
+    }
+
+    function showToast(message) {
+      const toast = document.createElement('div');
+      toast.textContent = message;
+      toast.style.cssText = `
+        position: fixed;
+        bottom: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--theme-accent);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 25px;
+        z-index: 1000;
+        font-size: 14px;
+        animation: fadeInOut 2s ease;
+      `;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2000);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function waitForSession() {
+      return new Promise((resolve) => {
+        const checkInterval = setInterval(() => {
+          if (typeof currentSessionUsername !== 'undefined' && currentSessionUsername) {
+            clearInterval(checkInterval);
+            resolve();
+          }
+        }, 100);
+      });
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', async () => {
+      await waitForSession();
+      await getCsrfToken();
+      loadCyberBites();
+      loadUploadLimits();
+      
+      document.getElementById('uploadShortBtn').onclick = openUploadModal;
+      
+      // Expose navigation functions globally
+      window.navigateUp = navigateUp;
+      window.navigateDown = navigateDown;
+    });
+
+    function setupVideoControls() {
+    const videos = document.querySelectorAll('.cyberbite-video');
+    
+    // Add click handler to each video
+    videos.forEach(video => {
+        video.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (video.paused) {
+            video.play();
+            // Show playing indicator briefly
+            showPlayPauseIndicator(video, 'play');
+        } else {
+            video.pause();
+            showPlayPauseIndicator(video, 'pause');
+        }
+        });
+    });
+    
+    // Global keyboard handler for spacebar
+    document.addEventListener('keydown', (e) => {
+        // Check if spacebar was pressed (key code 32)
+        if (e.code === 'Space' || e.keyCode === 32) {
+        e.preventDefault(); // Prevent page scroll
+        
+        // Get the currently playing/paused video
+        const activeVideoElement = document.querySelector('.cyberbite-video');
+        if (activeVideoElement) {
+            if (activeVideoElement.paused) {
+            activeVideoElement.play();
+            showPlayPauseIndicator(activeVideoElement, 'play');
+            } else {
+            activeVideoElement.pause();
+            showPlayPauseIndicator(activeVideoElement, 'pause');
+            }
+        }
+        }
+    });
+    }
+
+    // Show play/pause indicator overlay
+    function showPlayPauseIndicator(video, action) {
+    // Remove existing indicator
+    const existingIndicator = video.parentElement.querySelector('.play-pause-indicator');
+    if (existingIndicator) existingIndicator.remove();
+    
+    // Create indicator
+    const indicator = document.createElement('div');
+    indicator.className = 'play-pause-indicator';
+    indicator.innerHTML = action === 'play' 
+        ? '<svg width="48" height="48" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>'
+        : '<svg width="48" height="48" viewBox="0 0 24 24" fill="white"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+    
+    video.parentElement.appendChild(indicator);
+    
+    // Animate and remove
+    setTimeout(() => {
+        indicator.style.opacity = '0';
+        setTimeout(() => indicator.remove(), 300);
+    }, 500);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,256 @@
+<!-- login.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in to Cybers/ash</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #000000;
+      color: #ffffff;
+      min-height: 100vh;
+      display: flex;
+    }
+    .left-side {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+    }
+    .left-side img {
+      width: 550px;
+      height: 550px;
+    }
+    .right-side {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 40px 100px;
+      max-width: 600px;
+    }
+    .logo {
+      width: 50px;
+      height: 50px;
+      margin-bottom: 30px;
+    }
+    h1 {
+      font-size: 64px;
+      font-weight: 800;
+      margin-bottom: 40px;
+      line-height: 1.1;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid #2f3336;
+      background-color: #000000;
+      color: #ffffff;
+      font-size: 16px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus {
+      border-color: #1d9bf0;
+    }
+    .form-group input::placeholder {
+      color: #71767b;
+    }
+    .login-btn {
+      background-color: #1d9bf0;
+      color: #ffffff;
+      border: none;
+      padding: 14px 32px;
+      border-radius: 9999px;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      width: 100%;
+      margin-top: 10px;
+    }
+    .login-btn:hover {
+      background-color: #1a8cd8;
+    }
+    .login-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .forgot-btn {
+      background-color: transparent;
+      color: #1d9bf0;
+      border: 1px solid #2f3336;
+      padding: 14px 32px;
+      border-radius: 9999px;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 15px;
+      width: 100%;
+    }
+    .forgot-btn:hover {
+      background-color: rgba(29, 155, 240, 0.1);
+    }
+    .signup-prompt {
+      margin-top: 40px;
+      font-size: 17px;
+      color: #71767b;
+    }
+    .signup-prompt a {
+      color: #1d9bf0;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .signup-prompt a:hover {
+      text-decoration: underline;
+    }
+    .error-message {
+      background-color: rgba(244, 67, 54, 0.1);
+      border: 1px solid #f44336;
+      color: #f44336;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+    .error-message.show {
+      display: block;
+    }
+    @media (max-width: 1000px) {
+      .left-side {
+        display: none;
+      }
+      .right-side {
+        padding: 20px;
+        max-width: 100%;
+      }
+      h1 {
+        font-size: 42px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="left-side">
+    <img alt="Cyberslash Logo" src = "Gemini_Generated_Image_tkdpcstkdpcstkdp.png">
+  </div>
+  <div class="right-side">
+    <img alt="Cyberslash Logo" src = "Gemini_Generated_Image_tkdpcstkdpcstkdp.png" class="logo">
+    <h1>Sign in to Cybers/ash</h1>
+    
+    <div id="errorMessage" class="error-message"></div>
+    
+    <div class="form-group">
+      <input type="text" id="loginUsername" placeholder="Username (Users: /user_X | Admins: /adminX)">
+    </div>
+    <div class="form-group">
+      <input type="password" id="loginPassword" placeholder="Password">
+    </div>
+    
+    <button class="login-btn" id="loginBtn" onclick="login()">Sign in</button>
+    <button class="forgot-btn" onclick="window.location.href='/forgot.html'">Forgot password?</button>
+    
+    <p class="signup-prompt">
+      Don't have an account? <a href="/signup.html">Sign up now!</a>
+    </p>
+  </div>
+
+  <script>
+    // Check if already logged in
+    fetch("/session", { credentials: "include" })
+      .then(res => res.json())
+      .then(user => {
+        if (user.username) {
+          window.location.href = "/index.html";
+        }
+      })
+      .catch(() => {});
+
+    // Get CSRF token
+    let csrfToken = "";
+    fetch("/csrf-token", { credentials: "include" })
+      .then(res => res.json())
+      .then(data => {
+        csrfToken = data.csrfToken;
+      });
+
+    function showError(msg) {
+      const errorEl = document.getElementById("errorMessage");
+      errorEl.textContent = msg;
+      errorEl.classList.add("show");
+    }
+
+    function hideError() {
+      document.getElementById("errorMessage").classList.remove("show");
+    }
+
+    function login() {
+      const username = document.getElementById("loginUsername").value.trim();
+      const password = document.getElementById("loginPassword").value;
+      
+      if (!username || !password) {
+        showError("Please enter both username and password");
+        return;
+      }
+
+      const loginBtn = document.getElementById("loginBtn");
+      loginBtn.disabled = true;
+      loginBtn.textContent = "Signing in...";
+      hideError();
+
+      fetch("/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken
+        },
+        credentials: "include",
+        body: JSON.stringify({ username, password })
+      })
+      .then(res => {
+        if (!res.ok) {
+          return res.json().then(data => {
+            throw new Error(data.error || "Login failed");
+          });
+        }
+        return res.json();
+      })
+      .then(data => {
+        if (data.requires2fa) {
+          // Store username for 2FA verification
+          sessionStorage.setItem("loginUsername", username);
+          window.location.href = "/verify-2fa.html";
+        } else {
+          window.location.href = "/index.html";
+        }
+      })
+      .catch(err => {
+        showError(err.message || "Invalid credentials. Please try again.");
+        loginBtn.disabled = false;
+        loginBtn.textContent = "Sign in";
+      });
+    }
+
+    // Allow Enter key to submit
+    document.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") {
+        login();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,274 @@
+<!-- signup.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join Cybers/ash today</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #000000;
+      color: #ffffff;
+      min-height: 100vh;
+      display: flex;
+    }
+    .left-side {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+    }
+    .left-side img {
+      width: 550px;
+      height: 550px;
+    }
+    .right-side {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 40px 100px;
+      max-width: 600px;
+    }
+    .logo {
+      width: 50px;
+      height: 50px;
+      margin-bottom: 30px;
+    }
+    h1 {
+      font-size: 64px;
+      font-weight: 800;
+      margin-bottom: 40px;
+      line-height: 1.1;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid #2f3336;
+      background-color: #000000;
+      color: #ffffff;
+      font-size: 16px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus {
+      border-color: #1d9bf0;
+    }
+    .form-group input::placeholder {
+      color: #71767b;
+    }
+    .info-box {
+      background-color: rgba(29, 155, 240, 0.1);
+      border: 1px solid rgba(29, 155, 240, 0.3);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      color: #1d9bf0;
+      line-height: 1.5;
+    }
+    .info-box strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+    .signup-btn {
+      background-color: #ffffff;
+      color: #000000;
+      border: none;
+      padding: 14px 32px;
+      border-radius: 9999px;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      width: 100%;
+      margin-top: 10px;
+    }
+    .signup-btn:hover {
+      background-color: #e6e6e6;
+    }
+    .signup-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .signin-prompt {
+      margin-top: 40px;
+      font-size: 17px;
+      color: #71767b;
+    }
+    .signin-prompt a {
+      color: #1d9bf0;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .signin-prompt a:hover {
+      text-decoration: underline;
+    }
+    .error-message {
+      background-color: rgba(244, 67, 54, 0.1);
+      border: 1px solid #f44336;
+      color: #f44336;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+    .error-message.show {
+      display: block;
+    }
+    .password-requirements {
+      font-size: 13px;
+      color: #71767b;
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+    @media (max-width: 1000px) {
+      .left-side {
+        display: none;
+      }
+      .right-side {
+        padding: 20px;
+        max-width: 100%;
+      }
+      h1 {
+        font-size: 42px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="left-side">
+    <img alt="Cyberslash Logo" src = "Gemini_Generated_Image_tkdpcstkdpcstkdp.png">
+  </div>
+  <div class="right-side">
+    <img alt="Cyberslash Logo" src = "Gemini_Generated_Image_tkdpcstkdpcstkdp.png" class="logo">
+    <h1>Join Cybers/ash today</h1>
+    
+    <div id="errorMessage" class="error-message"></div>
+    
+    <div class="info-box">
+      <strong>🔒 Anonymity First</strong>
+      Cybers/ash automatically sets your username for more anonymity. If you'd like to change it, subscribe to <a href="/premium.html" style="color: #1d9bf0;">/Premium</a>.
+    </div>
+    
+    <div class="form-group">
+      <input type="password" id="signupPassword" placeholder="Create a password">
+    </div>
+    <p class="password-requirements">
+      Password must be at least 8 characters and include uppercase, lowercase, number, and special character.
+    </p>
+    
+    <button class="signup-btn" id="signupBtn" onclick="signup()">Sign up</button>
+    
+    <p class="signin-prompt">
+      Already have an account? <a href="/login.html">Sign in</a>
+    </p>
+  </div>
+
+  <script>
+    // Check if already logged in
+    fetch("/session", { credentials: "include" })
+      .then(res => res.json())
+      .then(user => {
+        if (user.username) {
+          window.location.href = "/index.html";
+        }
+      })
+      .catch(() => {});
+
+    // Get CSRF token
+    let csrfToken = "";
+    fetch("/csrf-token", { credentials: "include" })
+      .then(res => res.json())
+      .then(data => {
+        csrfToken = data.csrfToken;
+      });
+
+    function isPasswordSecure(password) {
+      return (
+        typeof password === "string" &&
+        password.length >= 8 &&
+        /[A-Z]/.test(password) &&
+        /[a-z]/.test(password) &&
+        /[0-9]/.test(password) &&
+        /[^A-Za-z0-9]/.test(password)
+      );
+    }
+
+    function showError(msg) {
+      const errorEl = document.getElementById("errorMessage");
+      errorEl.textContent = msg;
+      errorEl.classList.add("show");
+    }
+
+    function hideError() {
+      document.getElementById("errorMessage").classList.remove("show");
+    }
+
+    function signup() {
+      const password = document.getElementById("signupPassword").value;
+      
+      if (!isPasswordSecure(password)) {
+        showError("Password must be at least 8 characters and include uppercase, lowercase, number, and special character.");
+        return;
+      }
+
+      const signupBtn = document.getElementById("signupBtn");
+      signupBtn.disabled = true;
+      signupBtn.textContent = "Creating account...";
+      hideError();
+
+      fetch("/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken
+        },
+        credentials: "include",
+        body: JSON.stringify({ password })
+      })
+      .then(res => {
+        if (!res.ok) {
+          return res.json().then(data => {
+            throw new Error(data.error || "Signup failed");
+          });
+        }
+        return res.json();
+      })
+      .then(data => {
+        // Store data for 2FA verification
+        sessionStorage.setItem("signupUsername", data.username);
+        sessionStorage.setItem("signupTempSecret", data.tempSecret);
+        sessionStorage.setItem("signupToken", data.signupToken);
+        sessionStorage.setItem("signupQrCode", data.qrCode);
+        window.location.href = "/verify-signup-2fa.html";
+      })
+      .catch(err => {
+        showError(err.message || "Signup failed. Please try again.");
+        signupBtn.disabled = false;
+        signupBtn.textContent = "Sign up";
+      });
+    }
+
+    // Allow Enter key to submit
+    document.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") {
+        signup();
+      }
+    });
+  </script>
+</body>
+</html>

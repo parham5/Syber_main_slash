@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forgot password? - Cybers/ash</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #000000;
+      color: #ffffff;
+      min-height: 100vh;
+      display: flex;
+    }
+    .left-side {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+    }
+    .left-side img {
+      width: 550px;
+      height: 550px;
+    }
+    .right-side {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 40px 100px;
+      max-width: 600px;
+    }
+    .logo {
+      width: 50px;
+      height: 50px;
+      margin-bottom: 30px;
+    }
+    h1 {
+      font-size: 64px;
+      font-weight: 800;
+      margin-bottom: 40px;
+      line-height: 1.1;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid #2f3336;
+      background-color: #000000;
+      color: #ffffff;
+      font-size: 16px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus {
+      border-color: #1d9bf0;
+    }
+    .form-group input::placeholder {
+      color: #71767b;
+    }
+    .btn {
+      background-color: #1d9bf0;
+      color: #ffffff;
+      border: none;
+      padding: 14px 32px;
+      border-radius: 9999px;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      width: 100%;
+      margin-top: 10px;
+    }
+    .btn:hover {
+      background-color: #1a8cd8;
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .prompt {
+      margin-top: 40px;
+      font-size: 17px;
+      color: #71767b;
+    }
+    .prompt a {
+      color: #1d9bf0;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .prompt a:hover {
+      text-decoration: underline;
+    }
+    .error-message {
+      background-color: rgba(244, 67, 54, 0.1);
+      border: 1px solid #f44336;
+      color: #f44336;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+    .error-message.show {
+      display: block;
+    }
+    .hidden {
+      display: none !important;
+    }
+    .password-requirements {
+      font-size: 13px;
+      color: #71767b;
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+    
+    /* New Styles for Blocked Recovery */
+    .blocked-container {
+      text-align: center;
+      animation: fadeIn 0.5s ease;
+    }
+    .blocked-icon {
+      font-size: 80px;
+      margin-bottom: 20px;
+      display: block;
+    }
+    .blocked-title {
+      font-size: 32px;
+      font-weight: 800;
+      margin-bottom: 20px;
+      color: #fff;
+    }
+    .blocked-message {
+      font-size: 18px;
+      color: #f44336; /* Red color for error/warning */
+      line-height: 1.5;
+      margin-bottom: 30px;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 1000px) {
+      .left-side {
+        display: none;
+      }
+      .right-side {
+        padding: 20px;
+        max-width: 100%;
+      }
+      h1 {
+        font-size: 42px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="left-side">
+    <img alt="Cyberslash Logo" src="Gemini_Generated_Image_tkdpcstkdpcstkdp.png">
+  </div>
+  <div class="right-side">
+    <img alt="Cyberslash Logo" src="Gemini_Generated_Image_tkdpcstkdpcstkdp.png" class="logo">
+    <h1>Forgot password?</h1>
+    <div id="errorMessage" class="error-message"></div>
+    
+    <!-- Step 1: Enter Username -->
+    <div id="stepUsername">
+      <div class="form-group">
+        <input type="text" id="forgotUsername" placeholder="Enter your username">
+      </div>
+      <button class="btn" id="continueBtn" onclick="checkUser()">Continue</button>
+    </div>
+    
+    <!-- Step 2: Reset Password -->
+    <div id="stepReset" class="hidden">
+      <!-- 2FA Section -->
+      <div id="twoFactorSection">
+        <div class="form-group">
+          <p class="password-requirements">Please enter the code from your authenticator app.</p>
+          <input type="text" id="forgotTwoFactorCode" placeholder="Authenticator Code" maxlength="6" autocomplete="one-time-code">
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <input type="password" id="forgotNewPassword" placeholder="New Password">
+      </div>
+      <div class="form-group">
+        <input type="password" id="forgotConfirmPassword" placeholder="Confirm New Password">
+      </div>
+      <p class="password-requirements">
+        Password must be at least 8 characters and include uppercase, lowercase, number, and special character.
+      </p>
+      <button class="btn" id="resetBtn" onclick="resetPassword()">Reset Password</button>
+    </div>
+
+    <!-- NEW: Step 3: Recovery Blocked (No 2FA) -->
+    <div id="recoveryBlocked" class="hidden">
+      <div class="blocked-container">
+        <span class="blocked-icon">🔒</span>
+        <h2 class="blocked-title">Account Recovery Unavailable</h2>
+        <p class="blocked-message" id="blockedMessageText">
+          You cannot recover your account because you didn't set up an authenticator app.
+        </p>
+        <p class="prompt">
+          Need help? <a href="/support.html">Contact Support</a>
+        </p>
+      </div>
+    </div>
+
+    <p class="prompt" id="signinPrompt">
+      Remember your password? <a href="/login.html">Sign in</a>
+    </p>
+  </div>
+  <script>
+    let csrfToken = "";
+    let currentUsername = "";
+    let requires2FA = false;
+
+    // Get CSRF token
+    fetch("/csrf-token", { credentials: "include" })
+      .then(res => res.json())
+      .then(data => {
+        csrfToken = data.csrfToken;
+      })
+      .catch(err => console.error("CSRF Error:", err));
+
+    function showError(msg) {
+      const errorEl = document.getElementById("errorMessage");
+      errorEl.textContent = msg;
+      errorEl.classList.add("show");
+    }
+    function hideError() {
+      document.getElementById("errorMessage").classList.remove("show");
+    }
+    function isPasswordSecure(password) {
+      return (
+        typeof password === "string" &&
+        password.length >= 8 &&
+        /[A-Z]/.test(password) &&
+        /[a-z]/.test(password) &&
+        /[0-9]/.test(password) &&
+        /[^A-Za-z0-9]/.test(password)
+      );
+    }
+
+    function checkUser() {
+      const username = document.getElementById("forgotUsername").value.trim();
+      if (!username) {
+        showError("Please enter your username");
+        return;
+      }
+      const continueBtn = document.getElementById("continueBtn");
+      continueBtn.disabled = true;
+      continueBtn.textContent = "Checking...";
+      hideError();
+
+      fetch("/api/forgot-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken
+        },
+        credentials: "include",
+        body: JSON.stringify({ username: username })
+      })
+      .then(res => res.json())
+      .then(data => {
+        currentUsername = username;
+        
+        // CHECK: If user does NOT have 2FA enabled
+        if (data.requires2fa === false) {
+            // Show the "Recovery Blocked" screen
+            document.getElementById("stepUsername").classList.add("hidden");
+            document.getElementById("stepReset").classList.add("hidden");
+            document.getElementById("recoveryBlocked").classList.remove("hidden");
+            document.getElementById("signinPrompt").classList.add("hidden");
+            
+            // Update message if server provides specific text
+            if(data.message) {
+                document.getElementById("blockedMessageText").innerText = data.message;
+            }
+            return;
+        }
+
+        // Normal Flow: User HAS 2FA
+        if (data.requires2fa) {
+          requires2FA = true;
+          document.getElementById("twoFactorSection").classList.remove("hidden");
+        } else {
+          requires2FA = false;
+          // If for some reason 2FA is not required (legacy accounts?), hide section
+          document.getElementById("twoFactorSection").classList.add("hidden");
+        }
+        
+        // Move to step 2
+        document.getElementById("stepUsername").classList.add("hidden");
+        document.getElementById("stepReset").classList.remove("hidden");
+        document.getElementById("signinPrompt").classList.add("hidden");
+        document.querySelector("h1").textContent = "Reset your password";
+      })
+      .catch(err => {
+        showError("Error checking user. Please try again.");
+        continueBtn.disabled = false;
+        continueBtn.textContent = "Continue";
+      });
+    }
+
+    function resetPassword() {
+      const newPassword = document.getElementById("forgotNewPassword").value;
+      const confirmPassword = document.getElementById("forgotConfirmPassword").value;
+      const twoFactorCode = document.getElementById("forgotTwoFactorCode").value;
+
+      if (!isPasswordSecure(newPassword)) {
+        showError("Password must be at least 8 characters and include uppercase, lowercase, number, and special character.");
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        showError("Passwords do not match");
+        return;
+      }
+      if (!twoFactorCode || twoFactorCode.length !== 6) {
+        showError("Please enter a valid authenticator code");
+        return;
+      }
+
+      const resetBtn = document.getElementById("resetBtn");
+      resetBtn.disabled = true;
+      resetBtn.textContent = "Resetting...";
+      hideError();
+
+      fetch("/api/forgot-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          username: currentUsername,
+          code: twoFactorCode,
+          newPassword: newPassword
+        })
+      })
+      .then(res => {
+        if (!res.ok) {
+          return res.json().then(data => {
+            throw new Error(data.error || "Password reset failed");
+          });
+        }
+        return res.json();
+      })
+      .then(data => {
+        alert("Password reset successful! Please login with your new password.");
+        window.location.href = "/login.html";
+      })
+      .catch(err => {
+        showError(err.message || "Password reset failed. Please try again.");
+        resetBtn.disabled = false;
+        resetBtn.textContent = "Reset Password";
+      });
+    }
+
+    // Allow Enter key to submit
+    document.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") {
+        if (!document.getElementById("stepUsername").classList.contains("hidden")) {
+          checkUser();
+        } else if (!document.getElementById("stepReset").classList.contains("hidden")) {
+          resetPassword();
+        }
+      }
+    });
+  </script>
+</body>
+</html>

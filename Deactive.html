@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deactivate Account</title>
+    <link rel="stylesheet" href="./styles/style.css">
+
+  <style>
+    :root {
+      --theme-bg-primary: #000000;
+      --theme-bg-secondary: #111111;
+      --theme-bg-tertiary: #1a1a1a;
+      --theme-border: #333333;
+      --theme-text-primary: #ffffff;
+      --theme-text-secondary: #888888;
+      --theme-accent: #667eea;
+      --theme-accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    body.theme-default {
+      --theme-bg-primary: #000000;
+      --theme-bg-secondary: #111111;
+      --theme-bg-tertiary: #1a1a1a;
+      --theme-border: #333333;
+      --theme-text-primary: #ffffff;
+      --theme-text-secondary: #888888;
+      --theme-accent: #1d9bf0;
+      --theme-accent-gradient: linear-gradient(135deg, #1d9bf0 0%, #1d9bf0 100%);
+    }
+    body.theme-discord {
+      --theme-bg-primary: #36393f;
+      --theme-bg-secondary: #2f3136;
+      --theme-bg-tertiary: #202225;
+      --theme-border: #202225;
+      --theme-text-primary: #ffffff;
+      --theme-text-secondary: #b9bbbe;
+      --theme-accent: #5865f2;
+      --theme-accent-gradient: linear-gradient(135deg, #5865f2 0%, #7289da 100%);
+    }
+    body.theme-amethyst {
+      --theme-bg-primary: #1a1a2e;
+      --theme-bg-secondary: #16213e;
+      --theme-bg-tertiary: #0f3460;
+      --theme-border: #333;
+      --theme-text-primary: #ffffff;
+      --theme-text-secondary: #a0a0a0;
+      --theme-accent: #667eea;
+      --theme-accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    body.theme-aurora {
+      --theme-bg-primary: #0a192f;
+      --theme-bg-secondary: #112240;
+      --theme-bg-tertiary: #233554;
+      --theme-border: #233554;
+      --theme-text-primary: #e6f1ff;
+      --theme-text-secondary: #8892b0;
+      --theme-accent: #00c6ff;
+      --theme-accent-gradient: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
+    }
+    body.theme-sunset {
+      --theme-bg-primary: #1a1a1a;
+      --theme-bg-secondary: #2d2d2d;
+      --theme-bg-tertiary: #3d3d3d;
+      --theme-border: #444;
+      --theme-text-primary: #ffffff;
+      --theme-text-secondary: #aaa;
+      --theme-accent: #f093fb;
+      --theme-accent-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    body.theme-forest {
+      --theme-bg-primary: #0d2018;
+      --theme-bg-secondary: #142b1f;
+      --theme-bg-tertiary: #1b3d2a;
+      --theme-border: #1b3d2a;
+      --theme-text-primary: #e8f5e9;
+      --theme-text-secondary: #81c784;
+      --theme-accent: #38ef7d;
+      --theme-accent-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+    body.theme-ocean {
+      --theme-bg-primary: #0f1c3f;
+      --theme-bg-secondary: #1a3a6e;
+      --theme-bg-tertiary: #2a5298;
+      --theme-border: #2a5298;
+      --theme-text-primary: #e0efff;
+      --theme-text-secondary: #8cb4e8;
+      --theme-accent: #2a5298;
+      --theme-accent-gradient: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    }
+    body.theme-midnight {
+      --theme-bg-primary: #0f0c29;
+      --theme-bg-secondary: #1a1a3a;
+      --theme-bg-tertiary: #302b63;
+      --theme-border: #302b63;
+      --theme-text-primary: #e0e0e0;
+      --theme-text-secondary: #9090a0;
+      --theme-accent: #764ba2;
+      --theme-accent-gradient: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    }
+    body.theme-fire {
+      --theme-bg-primary: #1a0a0a;
+      --theme-bg-secondary: #2d1515;
+      --theme-bg-tertiary: #4a1f1f;
+      --theme-border: #4a1f1f;
+      --theme-text-primary: #fff0f0;
+      --theme-text-secondary: #d0a0a0;
+      --theme-accent: #f5af19;
+      --theme-accent-gradient: linear-gradient(135deg, #f12711 0%, #f5af19 100%);
+    }
+    body {
+      background-color: var(--theme-bg-primary) !important;
+      background-attachment: fixed; /* Add this */
+      color: var(--theme-text-primary);
+    }
+    
+    .premium-container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      padding-bottom: 80px;
+    }
+    
+    .premium-hero {
+      text-align: center;
+      padding: 40px 20px;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      border-radius: 20px;
+      margin-bottom: 30px;
+      border: 1px solid #333;
+    }
+    
+    .premium-hero h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .premium-hero p {
+      color: #aaa;
+      font-size: 1.1rem;
+    }
+    
+    .premium-badge {
+      display: inline-block;
+      background: linear-gradient(90deg, #ffd700, #ffaa00);
+      color: #000;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 0.9rem;
+      margin-top: 15px;
+    }
+    
+    .premium-locked {
+      text-align: center;
+      padding: 60px 20px;
+      background: var(--theme-bg-secondary);
+      border-radius: 20px;
+      border: 1px solid var(--theme-border);
+    }
+    
+    .premium-locked h2 {
+      color: var(--theme-text-primary);
+      margin-bottom: 15px;
+    }
+    
+    .premium-locked p {
+      color: var(--theme-text-secondary);
+      margin-bottom: 20px;
+    }
+    
+    .premium-locked .lock-icon {
+      font-size: 4rem;
+      margin-bottom: 20px;
+    }
+    
+    .premium-locked a {
+      display: inline-block;
+      background: var(--theme-accent-gradient);
+      color: white;
+      padding: 12px 30px;
+      border-radius: 25px;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    
+    .feature-card {
+      background: var(--theme-bg-secondary);
+      border: 1px solid var(--theme-border);
+      border-radius: 16px;
+      padding: 25px;
+      margin-bottom: 20px;
+      transition: all 0.3s ease;
+    }
+    
+    .feature-card:hover {
+      border-color: var(--theme-accent);
+      transform: translateY(-3px);
+      box-shadow: 0 10px 40px rgba(102, 126, 234, 0.15);
+    }
+    
+    .feature-header {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+    
+    .feature-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+    
+    .feature-icon.group { background: var(--theme-accent-gradient); }
+    .feature-icon.theme { background: linear-gradient(135deg, #f093fb, #f5576c); }
+    .feature-icon.bg { background: linear-gradient(135deg, #11998e, #38ef7d); }
+    .feature-icon.username { background: linear-gradient(135deg, #00c6ff, #0072ff); }
+    .feature-icon.video { background: linear-gradient(135deg, #ee0979, #ff6a00); }
+    .feature-icon.pfp { background: linear-gradient(135deg, #667eea, #764ba2); }
+    
+    .feature-title {
+      color: var(--theme-text-primary);
+      font-size: 1.3rem;
+      font-weight: bold;
+    }
+    
+    .feature-desc {
+      color: var(--theme-text-secondary);
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    
+    .preview-box {
+      background: var(--theme-bg-primary);
+      border: 1px solid var(--theme-border);
+      border-radius: 12px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .preview-label {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: var(--theme-accent);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+    
+    .preview-note {
+      text-align: center;
+      color: var(--theme-text-secondary);
+      font-size: 0.85rem;
+      margin-top: 15px;
+      padding: 10px;
+      background: var(--theme-bg-tertiary);
+      border-radius: 8px;
+    }
+    .preview-note strong {
+      color: var(--theme-accent);
+    }
+    
+    .group-preview {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .group-preview-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--theme-border);
+    }
+    
+    .group-avatar-preview {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--theme-accent-gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+    }
+    
+    .group-info-preview h4 {
+      color: var(--theme-text-primary);
+      margin: 0;
+      font-size: 0.95rem;
+    }
+    
+    .group-info-preview span {
+      color: var(--theme-text-secondary);
+      font-size: 0.8rem;
+    }
+    
+    .group-members-preview {
+      display: flex;
+      gap: 5px;
+    }
+    
+    .member-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #333;
+      border: 2px solid var(--theme-bg-primary);
+    }
+    
+    .member-count {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--theme-accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 0.7rem;
+      font-weight: bold;
+    }
+    
+    .theme-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+    
+    .theme-preview-item {
+      aspect-ratio: 1;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    
+    .theme-preview-item:hover {
+      transform: scale(1.1);
+    }
+    
+    .theme-preview-item.active {
+      border-color: white;
+      box-shadow: 0 0 10px rgba(255,255,255,0.5);
+    }
+    
+    .bg-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    
+    .bg-preview-item {
+      aspect-ratio: 16/9;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    .bg-preview-item:hover {
+      transform: scale(1.05);
+    }
+    
+    .bg-preview-item.active {
+      border-color: white;
+      box-shadow: 0 0 10px rgba(255,255,255,0.5);
+    }
+    
+    .bg-preview-item::after {
+      content: "✓";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.7);
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: bold;
+    }
+    
+    .bg-preview-item.active::after {
+      display: flex;
+    }
+    
+    .username-preview {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 15px;
+      background: var(--theme-bg-tertiary);
+      border-radius: 8px;
+    }
+    
+    .username-preview-pfp {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--theme-accent-gradient);
+    }
+    
+    .username-preview-info h4 {
+      color: var(--theme-text-primary);
+      margin: 0;
+      font-size: 1rem;
+    }
+    
+    .username-preview-info span {
+      color: var(--theme-accent);
+      font-size: 0.9rem;
+    }
+    
+    .video-preview-container {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    
+    .video-preview-item {
+      text-align: center;
+    }
+    
+    .video-preview-icon {
+      width: 80px;
+      height: 80px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      margin: 0 auto 8px;
+    }
+    
+    .video-preview-icon.post {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+    }
+    
+    .video-preview-label {
+      color: var(--theme-text-secondary);
+      font-size: 0.8rem;
+    }
+    
+    .pfp-preview-container {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    
+    .pfp-preview-item {
+      text-align: center;
+    }
+    
+    .pfp-preview-img {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid var(--theme-accent);
+      margin-bottom: 8px;
+    }
+    
+    .pfp-preview-label {
+      color: var(--theme-text-secondary);
+      font-size: 0.8rem;
+    }
+    
+    .pfp-preview-img.gif {
+      border-color: #f093fb;
+    }
+    
+    .pfp-preview-img.video {
+      border-color: #f5576c;
+    }
+    
+    .coming-soon {
+      display: inline-block;
+      background: var(--theme-bg-tertiary);
+      color: var(--theme-text-secondary);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      margin-top: 10px;
+    }
+    
+    .save-settings-btn {
+      display: block;
+      width: 100%;
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 12px;
+      border: none;
+      background: var(--theme-accent-gradient);
+      color: white;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    
+    .save-settings-btn:hover {
+      transform: scale(1.02);
+    }
+    
+    .save-settings-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .save-message {
+      text-align: center;
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 8px;
+      display: none;
+    }
+    
+    .save-message.success {
+      display: block;
+      background: rgba(76, 175, 80, 0.2);
+      color: #4CAF50;
+    }
+    
+    .save-message.error {
+      display: block;
+      background: rgba(244, 67, 54, 0.2);
+      color: #f44336;
+    }
+    
+    .premium-footer {
+      text-align: center;
+      padding: 30px;
+      color: var(--theme-text-secondary);
+    }
+    
+    .premium-footer a {
+      color: var(--theme-accent);
+      text-decoration: none;
+    }
+    
+    .sidebar {
+      background-color: var(--theme-bg-secondary) !important;
+    }
+    
+    .sidebar a {
+      color: var(--theme-text-secondary) !important;
+    }
+    
+    .sidebar a:hover {
+      background-color: var(--theme-bg-tertiary) !important;
+      color: var(--theme-text-primary) !important;
+    }
+    
+    .mobile-navbar {
+      background-color: var(--theme-bg-secondary) !important;
+      border-top: 1px solid var(--theme-border) !important;
+    }
+    
+    @media (max-width: 600px) {
+      .premium-hero h1 {
+        font-size: 1.8rem;
+      }
+      
+      .theme-preview-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      
+      .bg-preview-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    .custom-bg-upload {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid var(--theme-border);
+    }
+
+    .custom-bg-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      background: var(--theme-bg-tertiary);
+      border: 2px dashed var(--theme-border);
+      border-radius: 10px;
+      cursor: pointer;
+      color: var(--theme-text-secondary);
+      font-size: 0.9rem;
+      transition: all 0.3s ease;
+    }
+
+    .custom-bg-label:hover {
+      border-color: var(--theme-accent);
+      color: var(--theme-accent);
+    }
+
+    .custom-bg-preview {
+      position: relative;
+      margin-top: 15px;
+      display: inline-block;
+    }
+
+    .custom-bg-preview img {
+      width: 120px;
+      height: 70px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 2px solid var(--theme-accent);
+    }
+
+    .remove-bg-btn {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #f44336;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .remove-bg-btn:hover {
+      background: #d32f2f;
+    }
+
+    .custom-bg-upload {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid var(--theme-border);
+    }
+
+    .custom-bg-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      background: var(--theme-bg-tertiary);
+      border: 2px dashed var(--theme-border);
+      border-radius: 10px;
+      cursor: pointer;
+      color: var(--theme-text-secondary);
+      font-size: 0.9rem;
+      transition: all 0.3s ease;
+    }
+
+    .custom-bg-label:hover {
+      border-color: var(--theme-accent);
+      color: var(--theme-accent);
+    }
+
+    .custom-bg-preview {
+      position: relative;
+      margin-top: 15px;
+      display: inline-block;
+    }
+
+    .custom-bg-preview img {
+      width: 120px;
+      height: 70px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 2px solid var(--theme-accent);
+    }
+
+    .remove-bg-btn {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #f44336;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .remove-bg-btn:hover {
+      background: #d32f2f;
+    }
+
+    /* Transparent sidebar and navbar when custom background is active */
+    body.has-custom-bg .sidebar,
+    body.has-custom-bg .mobile-navbar {
+      background-color: rgba(0, 0, 0, 0.5) !important;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    /* For different themes, adjust transparency */
+    body.theme-discord.has-custom-bg .sidebar,
+    body.theme-discord.has-custom-bg .mobile-navbar {
+      background-color: rgba(47, 49, 54, 0.7) !important;
+    }
+
+    body.theme-amethyst.has-custom-bg .sidebar,
+    body.theme-amethyst.has-custom-bg .mobile-navbar {
+      background-color: rgba(26, 26, 46, 0.7) !important;
+    }
+
+    body.theme-aurora.has-custom-bg .sidebar,
+    body.theme-aurora.has-custom-bg .mobile-navbar {
+      background-color: rgba(10, 25, 47, 0.7) !important;
+    }
+
+    body.theme-sunset.has-custom-bg .sidebar,
+    body.theme-sunset.has-custom-bg .mobile-navbar {
+      background-color: rgba(26, 26, 26, 0.7) !important;
+    }
+
+    body.theme-forest.has-custom-bg .sidebar,
+    body.theme-forest.has-custom-bg .mobile-navbar {
+      background-color: rgba(13, 32, 24, 0.7) !important;
+    }
+
+    body.theme-ocean.has-custom-bg .sidebar,
+    body.theme-ocean.has-custom-bg .mobile-navbar {
+      background-color: rgba(15, 28, 63, 0.7) !important;
+    }
+
+    body.theme-midnight.has-custom-bg .sidebar,
+    body.theme-midnight.has-custom-bg .mobile-navbar {
+      background-color: rgba(15, 12, 41, 0.7) !important;
+    }
+
+    body.theme-fire.has-custom-bg .sidebar,
+    body.theme-fire.has-custom-bg .mobile-navbar {
+      background-color: rgba(26, 10, 10, 0.7) !important;
+    }
+
+    /* Default theme transparency */
+    body.theme-default.has-custom-bg .sidebar,
+    body.theme-default.has-custom-bg .mobile-navbar {
+      background-color: rgba(17, 17, 17, 0.7) !important;
+    }
+
+    .logoName {
+        font-size: 6rem;
+        color: #000000;
+        text-shadow:
+        0 0 5px #ffffff,
+        0 0 10px #ffffff,
+        0 0 20px #ffffff,
+        0 0 40px #ffffff;
+        font-weight: normal;
+        text-align: center;
+        margin: 0px;
+        font-family: sans-serif;
+    }
+
+    @media (max-width: 600px) {
+    .logoName {
+        font-size: 3rem;
+    }
+    }
+
+    /* 
+       THEME VARIABLES 
+       These control the colors of the sidebar, text, and accents 
+    */
+    :root {
+      --theme-bg-primary: #000000;
+      --theme-bg-secondary: #111111;
+      --theme-bg-tertiary: #1a1a1a;
+      --theme-border: #333333;
+      --theme-text-primary: #ffffff;
+      --theme-text-secondary: #888888;
+      --theme-accent: #667eea;
+      --theme-accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    body.theme-default {
+      --theme-bg-primary: #000000;
+      --theme-bg-secondary: #111111;
+      --theme-bg-tertiary: #1a1a1a;
+      --theme-border: #333333;
+      --theme-text-primary: #ffffff;
+      --theme-text-secondary: #888888;
+      --theme-accent: #1d9bf0;
+      --theme-accent-gradient: linear-gradient(135deg, #1d9bf0 0%, #1d9bf0 100%);
+    }
+    body.theme-discord {
+      --theme-bg-primary: #36393f;
+      --theme-bg-secondary: #2f3136;
+      --theme-bg-tertiary: #202225;
+      --theme-border: #202225;
+      --theme-text-primary: #ffffff;
+      --theme-text-secondary: #b9bbbe;
+      --theme-accent: #5865f2;
+      --theme-accent-gradient: linear-gradient(135deg, #5865f2 0%, #7289da 100%);
+    }
+    body.theme-amethyst {
+      --theme-bg-primary: #1a1a2e;
+      --theme-bg-secondary: #16213e;
+      --theme-bg-tertiary: #0f3460;
+      --theme-border: #333;
+      --theme-text-primary: #ffffff;
+      --theme-text-secondary: #a0a0a0;
+      --theme-accent: #667eea;
+      --theme-accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    body.theme-aurora {
+      --theme-bg-primary: #0a192f;
+      --theme-bg-secondary: #112240;
+      --theme-bg-tertiary: #233554;
+      --theme-border: #233554;
+      --theme-text-primary: #e6f1ff;
+      --theme-text-secondary: #8892b0;
+      --theme-accent: #00c6ff;
+      --theme-accent-gradient: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
+    }
+    body.theme-sunset {
+      --theme-bg-primary: #1a1a1a;
+      --theme-bg-secondary: #2d2d2d;
+      --theme-bg-tertiary: #3d3d3d;
+      --theme-border: #444;
+      --theme-text-primary: #ffffff;
+      --theme-text-secondary: #aaa;
+      --theme-accent: #f093fb;
+      --theme-accent-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    body.theme-forest {
+      --theme-bg-primary: #0d2018;
+      --theme-bg-secondary: #142b1f;
+      --theme-bg-tertiary: #1b3d2a;
+      --theme-border: #1b3d2a;
+      --theme-text-primary: #e8f5e9;
+      --theme-text-secondary: #81c784;
+      --theme-accent: #38ef7d;
+      --theme-accent-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+    body.theme-ocean {
+      --theme-bg-primary: #0f1c3f;
+      --theme-bg-secondary: #1a3a6e;
+      --theme-bg-tertiary: #2a5298;
+      --theme-border: #2a5298;
+      --theme-text-primary: #e0efff;
+      --theme-text-secondary: #8cb4e8;
+      --theme-accent: #2a5298;
+      --theme-accent-gradient: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    }
+    body.theme-midnight {
+      --theme-bg-primary: #0f0c29;
+      --theme-bg-secondary: #1a1a3a;
+      --theme-bg-tertiary: #302b63;
+      --theme-border: #302b63;
+      --theme-text-primary: #e0e0e0;
+      --theme-text-secondary: #9090a0;
+      --theme-accent: #764ba2;
+      --theme-accent-gradient: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    }
+    body.theme-fire {
+      --theme-bg-primary: #1a0a0a;
+      --theme-bg-secondary: #2d1515;
+      --theme-bg-tertiary: #4a1f1f;
+      --theme-border: #4a1f1f;
+      --theme-text-primary: #fff0f0;
+      --theme-text-secondary: #d0a0a0;
+      --theme-accent: #f5af19;
+      --theme-accent-gradient: linear-gradient(135deg, #f12711 0%, #f5af19 100%);
+    }
+
+    /* Apply the CSS variables to the body */
+    body {
+      background-color: var(--theme-bg-primary) !important;
+      background-attachment: fixed;
+      color: var(--theme-text-primary);
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+    
+    /* Sidebar styling using theme variables */
+    .sidebar {
+      background-color: var(--theme-bg-secondary) !important;
+      border-right: 1px solid var(--theme-border);
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+    
+    .sidebar a {
+      color: var(--theme-text-secondary) !important;
+    }
+    
+    .sidebar a:hover {
+      background-color: var(--theme-bg-tertiary) !important;
+      color: var(--theme-text-primary) !important;
+    }
+    
+    .mobile-navbar {
+      background-color: var(--theme-bg-secondary) !important;
+      border-top: 1px solid var(--theme-border) !important;
+    }
+
+
+    
+    /* Transparent sidebar and navbar when custom background is active */
+    body.has-custom-bg .sidebar,
+    body.has-custom-bg .mobile-navbar {
+      background-color: rgba(0, 0, 0, 0.5) !important;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    /* For different themes, adjust transparency */
+    body.theme-discord.has-custom-bg .sidebar,
+    body.theme-discord.has-custom-bg .mobile-navbar {
+      background-color: rgba(47, 49, 54, 0.7) !important;
+    }
+    body.theme-amethyst.has-custom-bg .sidebar,
+    body.theme-amethyst.has-custom-bg .mobile-navbar {
+      background-color: rgba(26, 26, 46, 0.7) !important;
+    }
+    body.theme-aurora.has-custom-bg .sidebar,
+    body.theme-aurora.has-custom-bg .mobile-navbar {
+      background-color: rgba(10, 25, 47, 0.7) !important;
+    }
+    body.theme-sunset.has-custom-bg .sidebar,
+    body.theme-sunset.has-custom-bg .mobile-navbar {
+      background-color: rgba(26, 26, 26, 0.7) !important;
+    }
+    body.theme-forest.has-custom-bg .sidebar,
+    body.theme-forest.has-custom-bg .mobile-navbar {
+      background-color: rgba(13, 32, 24, 0.7) !important;
+    }
+    body.theme-ocean.has-custom-bg .sidebar,
+    body.theme-ocean.has-custom-bg .mobile-navbar {
+      background-color: rgba(15, 28, 63, 0.7) !important;
+    }
+    body.theme-midnight.has-custom-bg .sidebar,
+    body.theme-midnight.has-custom-bg .mobile-navbar {
+      background-color: rgba(15, 12, 41, 0.7) !important;
+    }
+    body.theme-fire.has-custom-bg .sidebar,
+    body.theme-fire.has-custom-bg .mobile-navbar {
+      background-color: rgba(26, 10, 10, 0.7) !important;
+    }
+    /* Default theme transparency */
+    body.theme-default.has-custom-bg .sidebar,
+    body.theme-default.has-custom-bg .mobile-navbar {
+      background-color: rgba(17, 17, 17, 0.7) !important;
+    }
+
+    .logoName {
+        font-size: 6rem;
+        color: #000000;
+        text-shadow:
+        0 0 5px #ffffff,
+        0 0 10px #ffffff,
+        0 0 20px #ffffff,
+        0 0 40px #ffffff;
+        font-weight: normal;
+        text-align: center;
+        margin: 0px;
+        font-family: sans-serif;
+    }
+    @media (max-width: 600px) {
+    .logoName {
+        font-size: 3rem;
+    }
+    }
+
+    .main-content{
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+  </style>
+    <style>
+        /* Simple Modal Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-content {
+            background: #1e1e1e; /* Match your dark theme */
+            padding: 2rem;
+            border-radius: 12px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            border: 1px solid #333;
+        }
+        .modal-content h3 { margin-top: 0; color: #ff4d4d; }
+        .modal-content p { color: #ccc; margin-bottom: 1.5rem; }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .btn-cancel {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .btn-confirm-delete {
+            background: #ff4d4d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="layout-container">
+        
+        <aside class="sidebar mobile-hidden">
+            <div class="sidebar-header">
+                <div class="user-profile" onclick="window.location.href='./index.html'">
+                    <img src="./pictures/user.png" alt="User Avatar" class="avatar">
+                    <div class="user-info">
+                        <span class="username">Loading...</span>
+                        <span class="handle">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Search settings..." class="search-input">
+            </div>
+            <nav class="settings-nav">
+                <ul>
+                    <li class="nav-item">
+                        <a href="./Account.html" class="nav-link">
+                            <svg viewBox="0 0 24 24" fill="none" class="nav-svg">
+                                <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Account
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="./Security and Privacy.html" class="nav-link">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-svg">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            </svg>
+                            Security & Privacy
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="./screen-time.html" class="nav-link">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-svg">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                            Screen Time
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="./Notifications.html" class="nav-link">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-svg">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                            </svg>
+                            Notifications
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#display" class="nav-link">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-svg">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                <line x1="8" y1="21" x2="16" y2="21"></line>
+                                <line x1="12" y1="17" x2="12" y2="21"></line>
+                            </svg>
+                            Display & Theme
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/premium.html" class="nav-link">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-svg">
+                                <path d="M6 3h12l4 6-10 13L2 9z"></path>
+                                <path d="M11 3 8 9l4 13 4-13-3-6"></path>
+                                <path d="M2 9h20"></path>
+                            </svg>
+                            Premium
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#additional" class="nav-link">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nav-svg">
+                            <circle cx="12" cy="12" r="10" stroke-width="1.5" />
+                            <ellipse cx="12" cy="12" rx="4" ry="10" stroke-width="1.5" />
+                            <line x1="2" y1="12" x2="22" y2="12" stroke-width="1.5" />
+                            </svg>
+                            Language
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <button class="btn-logout">Sign Out</button>
+            </div>
+        </aside>
+        <main class="main-content">
+            
+            <header class="mobile-header">
+                <div class="mobile-header-top">
+                    <a href="Account.html" class="back-btn">
+                        <h1>← Deactivate Account</h1>
+                    </a>
+                </div>
+            </header>
+            <div class="content-body">
+                
+                <section class="settings-section">
+                    <div class="card danger-zone">
+                        <h3>Account Deactivation</h3>
+                        <p class="helper-text">When you deactivate your account, we'll immediately remove your profile from public places like search and lists. This action is <strong>irreversible</strong>.</p>
+                        
+                        <!-- Updated Button -->
+                        <button class="btn-danger" id="deactivate-btn">Deactivate Account</button>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <!-- Confirmation Modal -->
+        <div class="modal-overlay" id="deactivate-modal">
+            <div class="modal-content">
+                <h3>Are you sure?</h3>
+                <p>This will permanently delete your account, all your posts, messages, and data. This cannot be undone.</p>
+                <div class="modal-buttons">
+                    <button class="btn-cancel" id="cancel-deactivate">Cancel</button>
+                    <button class="btn-confirm-delete" id="confirm-deactivate">Yes, Delete My Account</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="./settings-utils.js"></script>
+    <script src="./account-settings.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        // 1. Load User Data for Sidebar
+        try {
+            const sessionRes = await fetch('/session', { credentials: 'include' });
+            if (sessionRes.ok) {
+                const session = await sessionRes.json();
+                const userRes = await fetch(`/api/user-info/${encodeURIComponent(session.username)}`, { credentials: 'include' });
+                const user = await userRes.json();
+                
+                // Update Sidebar
+                const sidebarUsername = document.querySelector('.username');
+                const sidebarHandle = document.querySelector('.handle');
+                const sidebarAvatar = document.querySelector('.avatar');
+                
+                if (sidebarUsername) sidebarUsername.textContent = user.username;
+                if (sidebarHandle) sidebarHandle.textContent = user.username;
+                if (sidebarAvatar && user.pfp) sidebarAvatar.src = user.pfp;
+                
+                // Update Deactivate Button Text
+                const deactivateBtn = document.getElementById('deactivate-btn');
+                if (deactivateBtn) {
+                    deactivateBtn.textContent = `Deactivate ${user.username}`;
+                }
+            }
+        } catch (err) {
+            console.error('Failed to load user data:', err);
+        }
+
+        // 2. Modal Logic
+        const modal = document.getElementById('deactivate-modal');
+        const openBtn = document.getElementById('deactivate-btn');
+        const cancelBtn = document.getElementById('cancel-deactivate');
+        const confirmBtn = document.getElementById('confirm-deactivate');
+
+        if (openBtn) {
+            openBtn.addEventListener('click', () => {
+                modal.classList.add('active');
+            });
+        }
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => {
+                modal.classList.remove('active');
+            });
+        }
+
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', async () => {
+                try {
+                    // --- CRITICAL FIX: Get CSRF Token ---
+                    let csrfToken = null;
+                    try {
+                        const tokenRes = await fetch('/csrf-token', { credentials: 'include' });
+                        if (tokenRes.ok) {
+                            const tokenData = await tokenRes.json();
+                            csrfToken = tokenData.csrfToken;
+                        }
+                    } catch (e) {
+                        console.error('Failed to get CSRF token', e);
+                    }
+
+                    // --- Send DELETE Request WITH Token ---
+                    const response = await fetch('/api/delete-account', {
+                        method: 'DELETE',
+                        credentials: 'include',
+                        headers: {
+                            'X-CSRF-Token': csrfToken // Send the token here
+                        }
+                    });
+
+                    if (response.ok) {
+                        // Clear local storage/session if any
+                        localStorage.clear();
+                        // Redirect to home or login
+                        window.location.href = '/index.html';
+                    } else {
+                        const error = await response.json();
+                        alert('Failed to delete account: ' + (error.error || 'Unknown error'));
+                        modal.classList.remove('active');
+                    }
+                } catch (err) {
+                    alert('Network error while deleting account.');
+                    modal.classList.remove('active');
+                }
+            });
+        }
+    });
+
+    // --- THEME & BACKGROUND LOGIC ---
+
+    // Global variables
+    let currentSessionUsername = "";
+    let csrfToken = "";
+    let selectedTheme = "theme-default";
+    let selectedBackground = "none";
+    let customBgUrl = null;
+
+    // Gradient definitions
+    const gradients = {
+      'gradient1': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      'gradient2': 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+      'gradient3': 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+      'gradient4': 'linear-gradient(135deg, #00c6ff 0%, #0072ff 100%)',
+      'gradient5': 'linear-gradient(135deg, #f12711 0%, #f5af19 100%)',
+      'gradient6': 'linear-gradient(135deg, #ee0979 0%, #ff6a00 100%)',
+      'gradient7': 'linear-gradient(135deg, #0f0c29 0%, #302b63 100%)'
+    };
+
+    // Function to apply theme
+    function applyTheme(themeName) {
+      document.body.classList.remove(
+        'theme-default', 'theme-discord', 'theme-amethyst',
+        'theme-aurora', 'theme-sunset', 'theme-forest',
+        'theme-ocean', 'theme-midnight', 'theme-fire'
+      );
+      if (themeName) {
+        document.body.classList.add(themeName);
+      }
+      selectedTheme = themeName;
+      // Save to local storage for persistence during session
+      localStorage.setItem('cyberslash_theme', themeName);
+    }
+
+    // Function to apply background
+    function applyBackground(bgName, isCustom, customUrl) {
+      console.log("[BG] Applying background:", bgName, "isCustom:", isCustom, "url:", customUrl);
+      
+      // Reset background
+      document.body.style.background = '';
+      document.body.style.backgroundImage = '';
+      
+      if (isCustom && customUrl) {
+        document.body.style.backgroundImage = `url('${customUrl}')`;
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundPosition = 'center';
+        document.body.style.backgroundRepeat = 'no-repeat';
+        customBgUrl = customUrl;
+        selectedBackground = 'custom';
+        
+        // Enable transparency for custom backgrounds
+        updateTransparency(true);
+      } else if (bgName && bgName !== 'none' && gradients[bgName]) {
+        document.body.style.backgroundImage = gradients[bgName];
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundPosition = 'center';
+        document.body.style.backgroundRepeat = 'no-repeat';
+        customBgUrl = null;
+        selectedBackground = bgName;
+        
+        // Disable transparency for gradients (optional)
+        updateTransparency(false);
+      } else {
+        customBgUrl = null;
+        selectedBackground = 'none';
+        
+        // Disable transparency when no background
+        updateTransparency(false);
+      }
+      localStorage.setItem('cyberslash_background', selectedBackground);
+    }
+
+    // Function to toggle transparency based on background type
+    function updateTransparency(isCustomBg) {
+      if (isCustomBg) {
+        document.body.classList.add('has-custom-bg');
+        console.log("[TRANSPARENCY] Enabled for custom background");
+      } else {
+        document.body.classList.remove('has-custom-bg');
+        console.log("[TRANSPARENCY] Disabled");
+      }
+    }
+
+    // Check Auth and Load Settings
+    function checkAuthAndLoadSettings() {
+      return fetch("/session", { credentials: "include" })
+        .then(res => {
+          if (!res.ok) throw new Error("Not logged in");
+          return res.json();
+        })
+        .then(user => {
+          currentSessionUsername = user.username;
+          console.log("[AUTH] Logged in as:", user.username);
+          return fetch(`/api/user-info/${encodeURIComponent(user.username)}`, { credentials: "include" });
+        })
+        .then(res => res.json())
+        .then(userData => {
+          console.log("[AUTH] User data:", userData);
+          
+          // Load saved theme
+          const savedTheme = userData.theme || localStorage.getItem('cyberslash_theme');
+          if (savedTheme) {
+            applyTheme(savedTheme);
+          }
+          
+          // Load saved background
+          if (userData.backgroundImage) {
+            console.log("[AUTH] Saved background:", userData.backgroundImage);
+            if (userData.backgroundImage.startsWith('/backgrounds/') || 
+                userData.backgroundImage.startsWith('storage/backgrounds/') ||
+                userData.backgroundImage.startsWith('storage/')) {
+              
+              // It's a custom uploaded image
+              let bgUrl = userData.backgroundImage;
+              if (!bgUrl.startsWith('/')) {
+                bgUrl = '/' + bgUrl;
+              }
+              applyBackground(null, true, bgUrl);
+            } else if (userData.backgroundImage.startsWith('gradient')) {
+              applyBackground(userData.backgroundImage, false, null);
+            }
+          } else {
+            // Check local storage fallback
+            const savedBg = localStorage.getItem('cyberslash_background');
+            if (savedBg) {
+              if (savedBg === 'custom' && customBgUrl) {
+                applyBackground(null, true, customBgUrl);
+              } else {
+                applyBackground(savedBg, false, null);
+              }
+            }
+          }
+        })
+        .catch(err => {
+          console.error("[AUTH] Error:", err);
+          // If not logged in, still apply default theme
+          applyTheme('theme-default');
+        });
+    }
+
+    // --- PAGE INITIALIZATION ---
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        // 1. Update sidebar user info
+        try {
+            const user = await getCurrentUser();
+            
+            const usernameSpan = document.querySelector('.sidebar .username');
+            const handleSpan = document.querySelector('.sidebar .handle');
+            const avatarImg = document.querySelector('.sidebar .avatar');
+            
+            if (usernameSpan) usernameSpan.textContent = user.username;
+            if (handleSpan) handleSpan.textContent = user.username;
+            if (avatarImg && user.pfp) avatarImg.src = user.pfp;
+            
+        } catch (err) {
+            console.error('Failed to load user:', err);
+        }
+        
+        // 2. Sign out button
+        const logoutBtn = document.querySelector('.btn-logout');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => logout());
+        }
+
+        // 3. Load Themes and Backgrounds
+        fetch("/csrf-token")
+          .then(r => r.json())
+          .then(d => {
+            csrfToken = d.csrfToken;
+            checkAuthAndLoadSettings();
+          })
+          .catch(err => console.error("Init error:", err));
+    });
+
+    // Make sure account button PFP updates when page loads
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const sessionRes = await fetch('/session', { credentials: 'include' });
+            if (sessionRes.ok) {
+                const session = await sessionRes.json();
+                const userRes = await fetch(`/api/user-info/${encodeURIComponent(session.username)}`, { credentials: 'include' });
+                const user = await userRes.json();
+                
+                const accountBtn = document.getElementById('accountBtn');
+                if (accountBtn && user.pfp) {
+                    const img = accountBtn.querySelector('img');
+                    if (img) img.src = user.pfp;
+                }
+            }
+        } catch (err) {
+            console.error('Failed to load account PFP:', err);
+        }
+    });
+
+    </script>
+    <script src="./global-tracking.js"></script>
+</body>
+</html>

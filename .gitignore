@@ -1,12 +1,6 @@
-storage/
 node_modules/
 .env
-.env.*
-!.env.example
-npm-debug.log*
-users.json
-messages.json
-directs.json
-waf_alerts.json
-honeypot_logs.txt
-permanent_bans.txt
+uploads/
+pfps/
+storage/
+*.log

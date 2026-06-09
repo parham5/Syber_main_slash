@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1763971546122,
+    "sender": "/admin1",
+    "receiver": "/admin2",
+    "message": "hi.",
+    "timestamp": 1763971546122
+  },
+  {
+    "id": 1768315701535,
+    "sender": "/admin1",
+    "receiver": "/user_2",
+    "message": "hi",
+    "timestamp": 1768315701535
+  },
+  {
+    "id": 1768994693443,
+    "sender": "/admin1",
+    "receiver": "/admin2",
+    "message": "hello.",
+    "timestamp": 1768994693443
+  }
+]

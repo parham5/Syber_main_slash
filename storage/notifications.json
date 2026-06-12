@@ -1,0 +1,44 @@
+[
+  {
+    "id": 1781261332282.1113,
+    "user": "/admin_1",
+    "type": "follow",
+    "fromUser": "/user_3",
+    "fromUserPfp": null,
+    "postId": null,
+    "message": "started following you",
+    "category": "social",
+    "actionUrl": "/pf.html?user=%2Fuser_3",
+    "read": true,
+    "archived": false,
+    "timestamp": 1781261332282
+  },
+  {
+    "id": 1781186892458.6152,
+    "user": "/user_1",
+    "type": "follow",
+    "fromUser": "/admin_1",
+    "fromUserPfp": "/pfps/d3f472e5d2dcb518c07e141c5ed8d9be",
+    "postId": null,
+    "message": "started following you",
+    "category": "social",
+    "actionUrl": "/pf.html?user=%2Fadmin_1",
+    "read": true,
+    "archived": false,
+    "timestamp": 1781186892458
+  },
+  {
+    "id": 1781175868778.5703,
+    "user": "/admin_1",
+    "type": "follow",
+    "fromUser": "/user_1",
+    "fromUserPfp": null,
+    "postId": null,
+    "message": "started following you",
+    "category": "social",
+    "actionUrl": "/pf.html?user=%2Fuser_1",
+    "read": true,
+    "archived": true,
+    "timestamp": 1781175868778
+  }
+]

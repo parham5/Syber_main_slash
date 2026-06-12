@@ -1,0 +1,62 @@
+{
+  "/admin_1": {
+    "password": "$2b$10$3epgPfK4DHuArLZkNSccOep.J2W/1R3BJ5Cx52n/5wRSh5m6zn9Qy",
+    "pfp": "/pfps/d3f472e5d2dcb518c07e141c5ed8d9be",
+    "about": "the hacker",
+    "isAdmin": true,
+    "role": "admin",
+    "isPremium": true,
+    "premium": true,
+    "premiumUntil": "2099-12-31T23:59:59.999Z",
+    "twoFactorSecret": "K4XUS4CNEUXEMLRPOAXFAJBKKJHV42Z4NESGCY22OE7GSUZPKZ4A",
+    "twoFactorEnabled": false,
+    "privacySettings": {
+      "dmPermission": "noone",
+      "lastSeen": "everyone",
+      "readReceipts": "everyone",
+      "slashVisibility": "everyone",
+      "reslashPermission": "everyone",
+      "replyPermission": "everyone"
+    },
+    "followers": [
+      "/user_1",
+      "/user_3"
+    ],
+    "following": [
+      "/user_1"
+    ],
+    "screenTime": {
+      "limitEnabled": false,
+      "limitHours": 2,
+      "limitMinutes": 0,
+      "history": {
+        "2026-06-10": {
+          "minutes": 11
+        },
+        "2026-06-11": {
+          "minutes": 0
+        },
+        "2026-06-12": {
+          "minutes": 0
+        }
+      }
+    },
+    "settings": {
+      "notificationPrefs": {
+        "mutedTypes": [],
+        "mutedCategories": [],
+        "soundEnabled": true,
+        "showUnreadOnly": false
+      }
+    },
+    "blockedUsers": [],
+    "mutedUsers": [],
+    "hiddenPosts": [
+      "1781185614659"
+    ],
+    "backgroundImage": "none",
+    "theme": "theme-default",
+    "pinnedPostId": 1781185614659,
+    "localPass": null
+  }
+}

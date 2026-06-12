@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#38d5e8">
+  <title>Offline - Cybers/ash</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="stylesheet" href="./ui-refactor.css">
+  <script src="./app-enhancements.js" defer></script>
+  <style>
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .offline-card {
+      width: min(100%, 520px);
+      padding: 32px;
+      border-radius: 18px;
+      border: 1px solid var(--ui-line);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+        rgba(12, 16, 24, 0.9);
+      box-shadow: var(--ui-shadow);
+      text-align: center;
+    }
+    .offline-mark {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 18px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      color: #041015;
+      background: linear-gradient(135deg, var(--ui-cyan), var(--ui-green));
+      font-size: 32px;
+      font-weight: 900;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 7vw, 3.4rem);
+      line-height: 1;
+    }
+    p {
+      color: var(--ui-muted);
+      line-height: 1.7;
+      margin: 0 0 22px;
+    }
+    button {
+      width: 100%;
+      min-height: 52px;
+      border-radius: 14px;
+      border: 0;
+      cursor: pointer;
+      font-weight: 800;
+      color: #041015;
+      background: linear-gradient(135deg, var(--ui-cyan), var(--ui-green));
+    }
+  </style>
+</head>
+<body>
+  <main class="offline-card">
+    <div class="offline-mark">/</div>
+    <h1>You are offline</h1>
+    <p>Cybers/ash could not reach the network. Reconnect and refresh to jump back into the live feed.</p>
+    <button type="button" onclick="window.location.reload()">Try again</button>
+  </main>
+</body>
+</html>

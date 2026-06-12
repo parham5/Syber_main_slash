@@ -1,0 +1,46 @@
+{
+  "name": "Cybers/ash",
+  "short_name": "Cybers/ash",
+  "description": "A focused social space for slashes, private messages, creator clips, and Nova.",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#06080d",
+  "theme_color": "#38d5e8",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48 64x64",
+      "type": "image/x-icon",
+      "purpose": "any"
+    },
+    {
+      "src": "/title.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["social", "productivity", "entertainment"],
+  "shortcuts": [
+    {
+      "name": "Home",
+      "short_name": "Home",
+      "url": "/index.html",
+      "description": "Open your Cybers/ash feed"
+    },
+    {
+      "name": "Messages",
+      "short_name": "DMs",
+      "url": "/directs.html",
+      "description": "Open private messages"
+    },
+    {
+      "name": "CyberBites",
+      "short_name": "Bites",
+      "url": "/cyberbites.html",
+      "description": "Open short creator clips"
+    }
+  ]
+}

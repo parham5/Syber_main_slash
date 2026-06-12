@@ -3,4 +3,12 @@ node_modules/
 uploads/
 pfps/
 storage/
+db/generated/
+backups/
 *.log
+users.json
+messages.json
+directs.json
+waf_alerts.json
+honeypot_logs.txt
+permanent_bans.txt

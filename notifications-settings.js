@@ -1,4 +1,13 @@
 document.addEventListener('DOMContentLoaded', function() {
+    async function getCsrfToken() {
+        try {
+            const response = await fetch('/csrf-token', { credentials: 'include' });
+            const data = await response.json();
+            return data.csrfToken || '';
+        } catch {
+            return '';
+        }
+    }
     
     // --- 1. Ringtone Preview Logic ---
     const ringtoneSelector = document.getElementById('ringtoneSelector');
@@ -38,13 +47,24 @@ document.addEventListener('DOMContentLoaded', function() {
     const pushToggle = document.querySelector('.toggle-switch input[type="checkbox"]');
     
     if (pushToggle) {
+        fetch('/api/notifications/preferences', { credentials: 'include' })
+            .then(res => res.ok ? res.json() : null)
+            .then(prefs => {
+                if (prefs) pushToggle.checked = prefs.notificationsEnabled !== false;
+            })
+            .catch(() => {});
+
         pushToggle.addEventListener('change', async function() {
             const isEnabled = this.checked;
             
             try {
-                const response = await fetch('/api/user-settings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                const response = await fetch('/api/notifications/preferences', {
+                    method: 'PUT',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': await getCsrfToken()
+                    },
                     body: JSON.stringify({
                         notificationsEnabled: isEnabled 
                     })

@@ -8,6 +8,7 @@ const cors = require("cors");
 const path = require("path");
 const bcrypt = require("bcrypt");
 const session = require("express-session");
+const { Server } = require("socket.io");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const sanitizeHtml = require("sanitize-html");
@@ -15,6 +16,11 @@ const csurf = require("csurf");
 const speakeasy = require('speakeasy');
 const qrcode = require('qrcode');
 const crypto = require('crypto');
+const os = require("os");
+const api = require("./lib/api-utils");
+const database = require("./lib/db");
+const feedRanking = require("./lib/feed-ranking");
+const postgresStore = require("./lib/postgres-store");
 
 const honeypotBlockedIPs = new Set();
 const permanentBlockedIPs = new Set();
@@ -25,9 +31,11 @@ const whitelistedIPs = (process.env.WHITELISTED_IPS || "151.238.130.92")
   .filter(Boolean);
 
 const DATA_DIR = path.join(__dirname, "storage");
+const STARTED_AT = new Date();
+const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || "1mb";
 const PUBLIC_FILE_EXTENSIONS = new Set([
   ".html", ".css", ".js", ".ico", ".png", ".jpg", ".jpeg", ".gif", ".webp",
-  ".svg", ".mp3", ".wav", ".ogg", ".ttf", ".woff", ".woff2", ".map"
+  ".svg", ".mp3", ".wav", ".ogg", ".ttf", ".woff", ".woff2", ".map", ".webmanifest"
 ]);
 
 function isSensitivePublicPath(requestPath) {
@@ -80,6 +88,63 @@ function writeJsonFileAtomic(filePath, data) {
   fs.renameSync(tempPath, filePath);
 }
 
+function getLanUrls(port) {
+  const interfaces = os.networkInterfaces();
+  const urls = [];
+
+  Object.values(interfaces).forEach(entries => {
+    (entries || []).forEach(entry => {
+      if (!entry || entry.internal || entry.family !== "IPv4") return;
+      urls.push(`http://${entry.address}:${port}`);
+    });
+  });
+
+  return urls;
+}
+
+function getPagination(req, defaults = {}) {
+  const defaultLimit = defaults.defaultLimit || 50;
+  const maxLimit = defaults.maxLimit || 100;
+  const hasPagingQuery = req.query.limit !== undefined || req.query.offset !== undefined;
+  const rawLimit = Number.parseInt(req.query.limit, 10);
+  const rawOffset = Number.parseInt(req.query.offset, 10);
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, maxLimit) : defaultLimit;
+  const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? rawOffset : 0;
+
+  return { enabled: hasPagingQuery, limit, offset, maxLimit };
+}
+
+function paginateArray(items, pagination) {
+  const total = items.length;
+  const start = pagination.offset;
+  const end = start + pagination.limit;
+  const pageItems = items.slice(start, end);
+
+  return {
+    items: pageItems,
+    meta: {
+      limit: pagination.limit,
+      offset: pagination.offset,
+      total,
+      hasMore: end < total,
+      nextOffset: end < total ? end : null
+    }
+  };
+}
+
+function attachPaginationHeaders(res, meta) {
+  res.setHeader("X-Total-Count", String(meta.total));
+  res.setHeader("X-Page-Limit", String(meta.limit));
+  res.setHeader("X-Page-Offset", String(meta.offset));
+  if (meta.nextOffset !== null) res.setHeader("X-Next-Offset", String(meta.nextOffset));
+}
+
+function attachCursorHeaders(res, pagination) {
+  res.setHeader("X-Page-Limit", String(pagination.limit));
+  res.setHeader("X-Has-More", String(pagination.hasMore));
+  if (pagination.nextCursor) res.setHeader("X-Next-Cursor", pagination.nextCursor);
+}
+
 app.set('trust proxy', 1);
 
 // AI Recommendation System
@@ -114,6 +179,21 @@ function logError(message, error) {
   console.error(`[ERROR ${new Date().toISOString()}] ${message}`);
   if (error) console.error(error);
 }
+
+app.use((req, res, next) => {
+  req.id = crypto.randomUUID();
+  res.setHeader("X-Request-Id", req.id);
+
+  if (process.env.LOG_REQUESTS === "true") {
+    const started = Date.now();
+    res.on("finish", () => {
+      const durationMs = Date.now() - started;
+      console.log(`[REQ ${req.id}] ${req.method} ${req.originalUrl} ${res.statusCode} ${durationMs}ms`);
+    });
+  }
+
+  next();
+});
 
 // Make sure backgrounds directory exists
 const BG_DIR = path.join(__dirname, 'storage', 'backgrounds');
@@ -193,7 +273,8 @@ app.get("/", (req, res) => {
   }
 });
 
-app.use(express.json());
+app.use(express.json({ limit: JSON_BODY_LIMIT }));
+app.use(express.urlencoded({ extended: false, limit: JSON_BODY_LIMIT }));
 
 app.use((req, res, next) => {
     const userAgent = req.get('User-Agent') || '';
@@ -261,6 +342,41 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get("/api/health", (req, res) => {
+  api.sendOk(res, {
+    ok: true,
+    service: "cyberslash",
+    uptimeSeconds: Math.round(process.uptime()),
+    startedAt: STARTED_AT.toISOString(),
+    environment: process.env.NODE_ENV || "development"
+  });
+});
+
+app.get("/api/ready", api.asyncHandler(async (req, res) => {
+  const requiredFiles = [
+    path.join(DATA_DIR, "users.json"),
+    path.join(DATA_DIR, "messages.json"),
+    path.join(DATA_DIR, "directs.json")
+  ];
+  const missing = requiredFiles.filter(filePath => !fs.existsSync(filePath)).map(filePath => path.basename(filePath));
+
+  if (missing.length) {
+    return api.sendError(res, 503, "Storage files missing", { ok: false, missing });
+  }
+
+  const dbStatus = await database.checkConnection();
+  if (!dbStatus.ok) {
+    return api.sendError(res, 503, "Database is not ready", { ok: false, database: dbStatus });
+  }
+
+  api.sendOk(res, { ok: true, database: dbStatus });
+}));
+
+app.get("/api/db/status", api.asyncHandler(async (req, res) => {
+  const dbStatus = await database.checkConnection();
+  api.sendOk(res, dbStatus, dbStatus.ok ? 200 : 503);
+}));
+
 app.use(express.static(__dirname, {
   index: false,
   dotfiles: "deny",
@@ -285,7 +401,7 @@ if (process.env.NODE_ENV === "production" && sessionSecret === "development-only
   throw new Error("SESSION_SECRET must be set in production");
 }
 
-app.use(session({
+const sessionMiddleware = session({
   secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
@@ -295,7 +411,9 @@ app.use(session({
     sameSite: "lax",
     maxAge: 30 * 24 * 60 * 60 * 1000
   }
-}));
+});
+
+app.use(sessionMiddleware);
 
 // app.use(csurf());
 
@@ -382,6 +500,60 @@ const ALLOWED_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/gif"
 const ALLOWED_IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".ico"]);
 const ALLOWED_VIDEO_MIME_TYPES = new Set(["video/mp4", "video/webm", "video/ogg", "video/quicktime"]);
 const ALLOWED_VIDEO_EXTENSIONS = new Set([".mp4", ".webm", ".ogg", ".mov"]);
+const MEDIA_MANIFEST_FILE = path.join(DATA_DIR, "media.json");
+if (!fs.existsSync(MEDIA_MANIFEST_FILE)) writeJsonFileAtomic(MEDIA_MANIFEST_FILE, []);
+
+function loadMediaManifest() {
+  return readJsonFile(MEDIA_MANIFEST_FILE, []);
+}
+
+function saveMediaManifest(data) {
+  writeJsonFileAtomic(MEDIA_MANIFEST_FILE, data);
+}
+
+function getMediaPublicUrl(filePath) {
+  if (!filePath) return null;
+  const normalized = filePath.replace(/\\/g, "/");
+  const storageIndex = normalized.lastIndexOf("/storage/");
+  if (storageIndex !== -1) return normalized.slice(storageIndex + "/storage".length);
+  return normalized.startsWith("/") ? normalized : `/${normalized}`;
+}
+
+function registerMediaAsset({ req, file, owner, usage, caption = "", altText = "", linkedId = null }) {
+  if (!file || !owner) return null;
+  const manifest = loadMediaManifest();
+  const isVideo = file.mimetype?.startsWith("video/");
+  const url = getMediaPublicUrl(file.path);
+  const asset = {
+    id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    owner,
+    usage,
+    linkedId,
+    url,
+    filename: file.filename,
+    originalName: sanitizeHtml(file.originalname || "", { allowedTags: [], allowedAttributes: {} }),
+    mimeType: file.mimetype,
+    mediaType: isVideo ? "video" : "image",
+    size: file.size || 0,
+    caption: sanitizeHtml(caption || "", { allowedTags: [], allowedAttributes: {} }).slice(0, 180),
+    altText: sanitizeHtml(altText || "", { allowedTags: [], allowedAttributes: {} }).slice(0, 140),
+    createdAt: Date.now()
+  };
+  manifest.unshift(asset);
+  saveMediaManifest(manifest.slice(0, 5000));
+  return asset;
+}
+
+function removeMediaFileByUrl(url) {
+  if (!url || !url.startsWith("/")) return false;
+  const absolutePath = path.join(__dirname, "storage", url.replace(/^\//, ""));
+  if (!absolutePath.startsWith(DATA_DIR)) return false;
+  if (fs.existsSync(absolutePath)) {
+    fs.unlinkSync(absolutePath);
+    return true;
+  }
+  return false;
+}
 
 const storage = multer.diskStorage({
   
@@ -851,6 +1023,8 @@ app.post("/api/messages", upload.single("image"), (req, res) => {
   }
   
   const isVideo = req.file && req.file.mimetype.startsWith('video/');
+  const caption = sanitizeHtml(String(req.body.caption || "").trim(), { allowedTags: [], allowedAttributes: {} }).slice(0, 180);
+  const altText = sanitizeHtml(String(req.body.altText || "").trim(), { allowedTags: [], allowedAttributes: {} }).slice(0, 140);
   
   const newMsg = {
     id: Date.now(),
@@ -859,6 +1033,10 @@ app.post("/api/messages", upload.single("image"), (req, res) => {
     timestamp: Date.now(),
     imageUrl: req.file ? `/uploads/${req.file.filename}` : null,
     isVideo: isVideo, // Add this
+    mediaCaption: caption,
+    mediaAlt: altText,
+    mediaSize: req.file?.size || null,
+    mediaType: req.file ? (isVideo ? "video" : "image") : null,
     pfp: users[req.session.username]?.pfp || null,
     parentId: req.body.parentId ? parseInt(req.body.parentId, 10) : null,
     likes: [], saves: [], retweets: []
@@ -866,6 +1044,25 @@ app.post("/api/messages", upload.single("image"), (req, res) => {
   const messages = loadMessages();
   messages.push(newMsg);
   saveMessages(messages);
+  if (req.file) {
+    const asset = registerMediaAsset({
+      req,
+      file: req.file,
+      owner: req.session.username,
+      usage: "post",
+      caption,
+      altText,
+      linkedId: newMsg.id
+    });
+    if (asset) {
+      newMsg.mediaAssetId = asset.id;
+      const index = messages.findIndex(msg => msg.id === newMsg.id);
+      if (index !== -1) {
+        messages[index].mediaAssetId = asset.id;
+        saveMessages(messages);
+      }
+    }
+  }
   res.json(newMsg);
 
   if (newMsg.parentId) {
@@ -883,9 +1080,19 @@ if (newMsg.message) {
 }
 });
 
-app.get("/api/messages", (req, res) => {
+app.get("/api/messages", api.asyncHandler(async (req, res) => {
+  if (database.postgresRequested()) {
+    const page = await postgresStore.listMessages({
+      limit: req.query.limit,
+      cursor: req.query.cursor
+    });
+    attachCursorHeaders(res, page.pagination);
+    return res.json(page.items);
+  }
+
   const messages = loadMessages();
   const users = loadUsers();
+  const safetyState = req.session.username ? getViewerSafetyState(users, req.session.username) : null;
   
   // Calculate reply counts for each post
   const replyCounts = new Map();
@@ -896,7 +1103,10 @@ app.get("/api/messages", (req, res) => {
   });
   
   // Get all top-level posts (not replies)
-  let filteredMessages = messages.filter(msg => !msg.parentId);
+  let filteredMessages = messages.filter(msg => !msg.parentId && msg.moderationStatus !== "hidden");
+  if (safetyState) {
+    filteredMessages = filteredMessages.filter(msg => isPostVisibleToViewer(msg, safetyState));
+  }
   
   // Process each message to add metadata and resolve retweets
   filteredMessages = filteredMessages.map(msg => {
@@ -912,7 +1122,7 @@ app.get("/api/messages", (req, res) => {
     msg.replyCount = replyCounts.get(msg.id) || 0;
     
     // If this is a retweet, add original post data
-    if (msg.isRetweet && msg.retweetOf) {
+  if (msg.isRetweet && msg.retweetOf) {
       const originalPost = messages.find(m => m.id === msg.retweetOf);
       if (originalPost) {
         msg.originalUsername = originalPost.username;
@@ -924,21 +1134,91 @@ app.get("/api/messages", (req, res) => {
         msg.originalRetweets = originalPost.retweets?.length || 0;
       }
     }
+
+    if (msg.isQuote && msg.quoteOf) {
+      const quotedPost = messages.find(m => m.id === msg.quoteOf);
+      if (quotedPost) {
+        msg.quotedPost = {
+          id: quotedPost.id,
+          username: quotedPost.username,
+          message: quotedPost.message,
+          imageUrl: quotedPost.imageUrl,
+          isVideo: quotedPost.isVideo || false,
+          timestamp: quotedPost.timestamp,
+          pfp: users[quotedPost.username]?.pfp || quotedPost.pfp || null
+        };
+      }
+    }
+
+    msg.quoteCount = messages.filter(m => m.isQuote && m.quoteOf === msg.id).length;
     
     return msg;
   });
   
   // Sort by timestamp (newest first)
   filteredMessages.sort((a, b) => b.timestamp - a.timestamp);
-  
+
+  const pagination = getPagination(req, { defaultLimit: 50, maxLimit: 100 });
+  if (pagination.enabled) {
+    const page = paginateArray(filteredMessages, pagination);
+    attachPaginationHeaders(res, page.meta);
+    return res.json(page.items);
+  }
+
   res.json(filteredMessages);
-});
+}));
 
 app.get("/api/messages/:id/replies", (req, res) => {
-  const replies = loadMessages().filter(m => m.parentId === parseInt(req.params.id, 10));
+  const replies = loadMessages().filter(m => m.parentId === parseInt(req.params.id, 10) && m.moderationStatus !== "hidden");
   replies.forEach(msg => { if(!msg.saves) msg.saves = []; if(!msg.likes) msg.likes = []; });
   res.json(replies);
 
+});
+
+app.get("/api/media/gallery", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 60, 1), 120);
+  const type = String(req.query.type || "all").toLowerCase();
+  const owner = req.session.username;
+  let assets = loadMediaManifest()
+    .filter(asset => asset.owner === owner)
+    .filter(asset => type === "all" || asset.mediaType === type)
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    .slice(0, limit);
+
+  res.json({
+    assets,
+    summary: {
+      total: assets.length,
+      images: assets.filter(asset => asset.mediaType === "image").length,
+      videos: assets.filter(asset => asset.mediaType === "video").length,
+      bytes: assets.reduce((sum, asset) => sum + (Number(asset.size) || 0), 0)
+    }
+  });
+});
+
+app.delete("/api/media/:id", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const mediaId = String(req.params.id || "");
+  const manifest = loadMediaManifest();
+  const assetIndex = manifest.findIndex(asset => String(asset.id) === mediaId);
+  if (assetIndex === -1) return res.status(404).json({ error: "Media not found" });
+  const asset = manifest[assetIndex];
+  if (asset.owner !== req.session.username) return res.status(403).json({ error: "Forbidden" });
+
+  const messages = loadMessages();
+  const linkedPost = messages.find(msg => String(msg.mediaAssetId || "") === mediaId || msg.imageUrl === asset.url);
+  if (linkedPost) return res.status(409).json({ error: "This media is attached to a post. Delete the post first." });
+
+  let removedFile = false;
+  try {
+    removedFile = removeMediaFileByUrl(asset.url);
+  } catch (err) {
+    logError(`Failed to remove media asset ${mediaId}`, err);
+  }
+  manifest.splice(assetIndex, 1);
+  saveMediaManifest(manifest);
+  res.json({ success: true, removedFile });
 });
 
 app.delete("/api/messages/:id", (req, res) => {
@@ -951,6 +1231,8 @@ app.delete("/api/messages/:id", (req, res) => {
   if (messages[index].imageUrl) {
     const fp = path.join(UPLOAD_DIR, path.basename(messages[index].imageUrl));
     if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    const manifest = loadMediaManifest().filter(asset => asset.url !== messages[index].imageUrl && String(asset.linkedId || "") !== String(messages[index].id));
+    saveMediaManifest(manifest);
   }
   messages.splice(index, 1);
   saveMessages(messages);
@@ -1038,10 +1320,264 @@ function loadUsers() { return readJsonFile(USERS_FILE, {}); }
 function saveUsers(data) { writeJsonFileAtomic(USERS_FILE, data); }
 function isPasswordSecure(pw) { return typeof pw === "string" && pw.length >= 8 && /[A-Z]/.test(pw) && /[a-z]/.test(pw) && /[0-9]/.test(pw) && /[^A-Za-z0-9]/.test(pw); }
 
+const SAFETY_REPORTS_FILE = path.join(DATA_DIR, "safety-reports.json");
+function loadSafetyReports() { return readJsonFile(SAFETY_REPORTS_FILE, []); }
+function saveSafetyReports(data) { writeJsonFileAtomic(SAFETY_REPORTS_FILE, data); }
+
+function ensureUserSafetyLists(user) {
+  if (!Array.isArray(user.blockedUsers)) user.blockedUsers = [];
+  if (!Array.isArray(user.mutedUsers)) user.mutedUsers = [];
+  if (!Array.isArray(user.hiddenPosts)) user.hiddenPosts = [];
+  return user;
+}
+
+function getViewerSafetyState(users, viewerUsername) {
+  const viewer = users[viewerUsername];
+  if (!viewer) return { blockedUsers: new Set(), mutedUsers: new Set(), hiddenPosts: new Set(), blockedBy: new Set() };
+  ensureUserSafetyLists(viewer);
+  const blockedBy = new Set();
+  Object.entries(users).forEach(([username, user]) => {
+    ensureUserSafetyLists(user);
+    if (user.blockedUsers.includes(viewerUsername)) blockedBy.add(username);
+  });
+  return {
+    blockedUsers: new Set(viewer.blockedUsers),
+    mutedUsers: new Set(viewer.mutedUsers),
+    hiddenPosts: new Set(viewer.hiddenPosts.map(String)),
+    blockedBy
+  };
+}
+
+function isPostVisibleToViewer(msg, safetyState) {
+  if (!msg) return false;
+  if (msg.moderationStatus === "hidden") return false;
+  if (!safetyState) return true;
+  const author = msg.username;
+  return !safetyState.hiddenPosts.has(String(msg.id))
+    && !safetyState.blockedUsers.has(author)
+    && !safetyState.mutedUsers.has(author)
+    && !safetyState.blockedBy.has(author);
+}
+
 function loadDirects() {
   return readJsonFile(DIRECTS_FILE, []);
 }
 function saveDirects(data) { writeJsonFileAtomic(DIRECTS_FILE, data); }
+
+function normalizeDirectMessage(msg, users = {}) {
+  const sender = msg.sender;
+  const replyTo = msg.replyTo && typeof msg.replyTo === "object" ? {
+    id: msg.replyTo.id,
+    sender: msg.replyTo.sender,
+    message: msg.replyTo.message || "",
+    mediaName: msg.replyTo.mediaName || null
+  } : null;
+
+  return {
+    ...msg,
+    senderPfp: msg.senderPfp || users[sender]?.pfp || null,
+    pfp: msg.pfp || users[sender]?.pfp || null,
+    status: msg.status || "sent",
+    reactions: msg.reactions && typeof msg.reactions === "object" ? msg.reactions : {},
+    edited: Boolean(msg.edited),
+    editedAt: msg.editedAt || null,
+    replyTo
+  };
+}
+
+function userCanAccessDirectMessage(msg, username) {
+  if (!msg || !username) return false;
+  if (msg.groupId) {
+    const groups = loadGroups();
+    const group = groups.find(g => g.id === msg.groupId);
+    return Boolean(group && group.members.some(m => m.username === username));
+  }
+  return msg.sender === username || msg.receiver === username;
+}
+
+function isSameDirectConversation(msg, userA, userB) {
+  return (msg.sender === userA && msg.receiver === userB) || (msg.sender === userB && msg.receiver === userA);
+}
+
+function buildDirectReplyPreview(directs, replyToId, currentUser, receiver, groupId = null) {
+  const parsedId = Number(replyToId);
+  if (!Number.isFinite(parsedId)) return null;
+
+  const replyMessage = directs.find(m => m.id === parsedId);
+  if (!replyMessage) return null;
+
+  const sameThread = groupId
+    ? replyMessage.groupId === groupId
+    : isSameDirectConversation(replyMessage, currentUser, receiver);
+
+  if (!sameThread || !userCanAccessDirectMessage(replyMessage, currentUser)) return null;
+
+  const cleanText = sanitizeHtml(replyMessage.message || "", { allowedTags: [], allowedAttributes: {} }).trim();
+  return {
+    id: replyMessage.id,
+    sender: replyMessage.sender,
+    message: cleanText.slice(0, 140),
+    mediaName: replyMessage.mediaName || null
+  };
+}
+
+let io = null;
+const realtimeUsers = new Map();
+
+function getUserRoom(username) {
+  return `user:${username}`;
+}
+
+function getGroupRoom(groupId) {
+  return `group:${groupId}`;
+}
+
+function getOnlineUsernames() {
+  return Array.from(realtimeUsers.keys());
+}
+
+function broadcastOnlineUsers() {
+  const users = getOnlineUsernames();
+  if (io) io.emit("presence:update", { users, generatedAt: Date.now() });
+}
+
+function registerRealtimePresence(username, socketId) {
+  const sockets = realtimeUsers.get(username) || new Set();
+  sockets.add(socketId);
+  realtimeUsers.set(username, sockets);
+  onlineUsersMap.set(username, Date.now());
+  broadcastOnlineUsers();
+}
+
+function unregisterRealtimePresence(username, socketId) {
+  const sockets = realtimeUsers.get(username);
+  if (!sockets) return;
+  sockets.delete(socketId);
+  if (sockets.size === 0) realtimeUsers.delete(username);
+  broadcastOnlineUsers();
+}
+
+function emitDirectRealtime(message, users = null) {
+  if (!io || !message) return;
+  const normalized = normalizeDirectMessage(message, users || loadUsers());
+
+  if (message.groupId) {
+    io.to(getGroupRoom(message.groupId)).emit("group:message", normalized);
+    return;
+  }
+
+  if (message.sender) io.to(getUserRoom(message.sender)).emit("dm:message", normalized);
+  if (message.receiver) io.to(getUserRoom(message.receiver)).emit("dm:message", normalized);
+}
+
+function emitDirectStatusRealtime(payload) {
+  if (!io || !payload) return;
+  if (payload.sender) io.to(getUserRoom(payload.sender)).emit("dm:read", payload);
+  if (payload.reader) io.to(getUserRoom(payload.reader)).emit("dm:read", payload);
+}
+
+function emitMessageDeletedRealtime(message) {
+  if (!io || !message) return;
+  const payload = { id: message.id, groupId: message.groupId || null, sender: message.sender, receiver: message.receiver || null };
+  if (message.groupId) {
+    io.to(getGroupRoom(message.groupId)).emit("message:deleted", payload);
+    return;
+  }
+  if (message.sender) io.to(getUserRoom(message.sender)).emit("message:deleted", payload);
+  if (message.receiver) io.to(getUserRoom(message.receiver)).emit("message:deleted", payload);
+}
+
+function emitDirectMutationRealtime(message, eventName, users = null) {
+  if (!io || !message) return;
+  const normalized = normalizeDirectMessage(message, users || loadUsers());
+  if (message.groupId) {
+    io.to(getGroupRoom(message.groupId)).emit(eventName, normalized);
+    return;
+  }
+  if (message.sender) io.to(getUserRoom(message.sender)).emit(eventName, normalized);
+  if (message.receiver) io.to(getUserRoom(message.receiver)).emit(eventName, normalized);
+}
+
+function emitNotificationRealtime(notification) {
+  if (!io || !notification?.user) return;
+  io.to(getUserRoom(notification.user)).emit("notification:new", normalizeNotification(notification, loadUsers()));
+}
+
+function setupRealtime(server) {
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map(item => item.trim())
+    .filter(Boolean);
+
+  io = new Server(server, {
+    cors: {
+      origin: allowedOrigins.length ? allowedOrigins : true,
+      credentials: true
+    }
+  });
+
+  io.engine.use(sessionMiddleware);
+
+  io.use((socket, next) => {
+    const username = socket.request.session?.username;
+    if (!username) return next(new Error("Unauthorized"));
+    socket.username = username;
+    next();
+  });
+
+  io.on("connection", socket => {
+    const username = socket.username;
+    socket.join(getUserRoom(username));
+    registerRealtimePresence(username, socket.id);
+
+    loadGroups()
+      .filter(group => group.members.some(member => member.username === username))
+      .forEach(group => socket.join(getGroupRoom(group.id)));
+
+    socket.emit("presence:update", { users: getOnlineUsernames(), generatedAt: Date.now() });
+
+    socket.on("presence:ping", () => {
+      onlineUsersMap.set(username, Date.now());
+      socket.emit("presence:update", { users: getOnlineUsernames(), generatedAt: Date.now() });
+    });
+
+    socket.on("chat:join", payload => {
+      const otherUser = typeof payload?.user === "string" ? payload.user : null;
+      const groupId = typeof payload?.groupId === "string" ? payload.groupId : null;
+
+      if (groupId) {
+        const group = loadGroups().find(item => item.id === groupId);
+        if (group && group.members.some(member => member.username === username)) {
+          socket.join(getGroupRoom(groupId));
+        }
+        return;
+      }
+
+      if (otherUser) socket.join(`dm:${[username, otherUser].sort().join("|")}`);
+    });
+
+    socket.on("chat:typing", payload => {
+      const target = typeof payload?.target === "string" ? payload.target : null;
+      const groupId = typeof payload?.groupId === "string" ? payload.groupId : null;
+      const isTyping = payload?.isTyping === true;
+
+      if (groupId) {
+        const group = loadGroups().find(item => item.id === groupId);
+        if (!group || !group.members.some(member => member.username === username)) return;
+        socket.to(getGroupRoom(groupId)).emit("chat:typing", { user: username, groupId, isTyping });
+        return;
+      }
+
+      if (target) {
+        socket.to(getUserRoom(target)).emit("chat:typing", { user: username, target, isTyping });
+      }
+    });
+
+    socket.on("disconnect", () => {
+      unregisterRealtimePresence(username, socket.id);
+    });
+  });
+}
 
 app.post("/api/update-about", (req, res) => {
   if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
@@ -1071,6 +1607,11 @@ app.post("/api/follow/:username", (req, res) => {
   const current = users[currentUser];
   
   if (!target) return res.status(404).json({ error: "User not found" });
+  ensureUserSafetyLists(current);
+  ensureUserSafetyLists(target);
+  if (current.blockedUsers.includes(targetUser) || target.blockedUsers.includes(currentUser)) {
+    return res.status(403).json({ error: "You cannot follow this user" });
+  }
   
   if (!target.followers) target.followers = [];
   if (!current.following) current.following = [];
@@ -1121,6 +1662,130 @@ app.post("/api/unfollow/:username", (req, res) => {
   });
 });
 
+app.get("/api/safety/status/:username", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const targetUser = decodeURIComponent(req.params.username);
+  const users = loadUsers();
+  const current = users[req.session.username];
+  if (!current) return res.status(404).json({ error: "User not found" });
+  ensureUserSafetyLists(current);
+  res.json({
+    username: targetUser,
+    blocked: current.blockedUsers.includes(targetUser),
+    muted: current.mutedUsers.includes(targetUser)
+  });
+});
+
+app.post("/api/safety/report-post/:id", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+
+  const postId = parseInt(req.params.id, 10);
+  const messages = loadMessages();
+  const msg = messages.find(m => m.id === postId);
+  if (!msg) return res.status(404).json({ error: "Post not found" });
+  if (msg.username === req.session.username) return res.status(400).json({ error: "You cannot report your own post" });
+
+  const allowedReasons = new Set(["spam", "harassment", "hate", "sexual", "violence", "self-harm", "misinformation", "other"]);
+  const reason = String(req.body.reason || "other").trim().toLowerCase();
+  const cleanReason = allowedReasons.has(reason) ? reason : "other";
+  const details = sanitizeHtml(String(req.body.details || "").trim(), { allowedTags: [], allowedAttributes: {} }).slice(0, 500);
+
+  const reports = loadSafetyReports();
+  const existing = reports.find(report => report.postId === postId && report.reporter === req.session.username);
+  if (existing) return res.status(409).json({ error: "You already reported this post" });
+
+  const report = {
+    id: Date.now(),
+    postId,
+    reporter: req.session.username,
+    author: msg.username,
+    reason: cleanReason,
+    details,
+    status: "open",
+    createdAt: Date.now()
+  };
+
+  reports.push(report);
+  msg.reportCount = (Number(msg.reportCount) || 0) + 1;
+  saveSafetyReports(reports);
+  saveMessages(messages);
+  res.json({ success: true, reportId: report.id, reportCount: msg.reportCount });
+});
+
+app.post("/api/safety/hide-post/:id", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+
+  const postId = parseInt(req.params.id, 10);
+  const messages = loadMessages();
+  if (!messages.some(m => m.id === postId)) return res.status(404).json({ error: "Post not found" });
+
+  const users = loadUsers();
+  const current = users[req.session.username];
+  if (!current) return res.status(404).json({ error: "User not found" });
+  ensureUserSafetyLists(current);
+
+  const postKey = String(postId);
+  if (!current.hiddenPosts.map(String).includes(postKey)) current.hiddenPosts.push(postKey);
+  saveUsers(users);
+  res.json({ success: true, hiddenPosts: current.hiddenPosts.length });
+});
+
+app.post("/api/safety/mute/:username", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const targetUser = decodeURIComponent(req.params.username);
+  const users = loadUsers();
+  const current = users[req.session.username];
+  if (!current || !users[targetUser]) return res.status(404).json({ error: "User not found" });
+  if (targetUser === req.session.username) return res.status(400).json({ error: "You cannot mute yourself" });
+  ensureUserSafetyLists(current);
+  if (!current.mutedUsers.includes(targetUser)) current.mutedUsers.push(targetUser);
+  saveUsers(users);
+  res.json({ success: true, muted: true, username: targetUser });
+});
+
+app.delete("/api/safety/mute/:username", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const targetUser = decodeURIComponent(req.params.username);
+  const users = loadUsers();
+  const current = users[req.session.username];
+  if (!current) return res.status(404).json({ error: "User not found" });
+  ensureUserSafetyLists(current);
+  current.mutedUsers = current.mutedUsers.filter(username => username !== targetUser);
+  saveUsers(users);
+  res.json({ success: true, muted: false, username: targetUser });
+});
+
+app.post("/api/safety/block/:username", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const targetUser = decodeURIComponent(req.params.username);
+  const users = loadUsers();
+  const current = users[req.session.username];
+  const target = users[targetUser];
+  if (!current || !target) return res.status(404).json({ error: "User not found" });
+  if (targetUser === req.session.username) return res.status(400).json({ error: "You cannot block yourself" });
+
+  ensureUserSafetyLists(current);
+  if (!current.blockedUsers.includes(targetUser)) current.blockedUsers.push(targetUser);
+  current.following = (current.following || []).filter(username => username !== targetUser);
+  current.followers = (current.followers || []).filter(username => username !== targetUser);
+  target.following = (target.following || []).filter(username => username !== req.session.username);
+  target.followers = (target.followers || []).filter(username => username !== req.session.username);
+  saveUsers(users);
+  res.json({ success: true, blocked: true, username: targetUser });
+});
+
+app.delete("/api/safety/block/:username", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  const targetUser = decodeURIComponent(req.params.username);
+  const users = loadUsers();
+  const current = users[req.session.username];
+  if (!current) return res.status(404).json({ error: "User not found" });
+  ensureUserSafetyLists(current);
+  current.blockedUsers = current.blockedUsers.filter(username => username !== targetUser);
+  saveUsers(users);
+  res.json({ success: true, blocked: false, username: targetUser });
+});
+
 // Find the /api/user-info/:username endpoint and add bannerImage to the response
 app.get("/api/user-info/:username", (req, res) => {
   const targetUser = req.params.username;
@@ -1169,7 +1834,7 @@ app.get("/api/directs/list", (req, res) => {
   if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
   
   const currentUser = req.session.username;
-  const directs = loadDirects();
+  const directs = loadDirects().filter(msg => !msg.groupId && msg.sender && msg.receiver);
   const users = loadUsers();
   
   // 1. Identify all users this user has interacted with
@@ -1311,7 +1976,7 @@ app.get("/api/directs/list", (req, res) => {
         username: username,
         pfp: user?.pfp || null,
         hasUnread: hasUnread,
-        lastMessage: latestMsg ? latestMsg.message : "No messages yet",
+        lastMessage: latestMsg ? (latestMsg.message || (latestMsg.mediaUrl ? (latestMsg.isVideo ? "Sent a video" : "Sent an image") : "No messages yet")) : "No messages yet",
         lastMessageSender: latestMsg ? latestMsg.sender : null,
         lastMessageTime: timeString,
         // Use the timestamp for precise sorting
@@ -1332,10 +1997,26 @@ app.get("/api/directs/list", (req, res) => {
   res.json(conversationListWithTime);
 });
 
-app.get("/api/directs/history/:otherUser", (req, res) => {
+app.get("/api/directs/history/:otherUser", api.asyncHandler(async (req, res) => {
   if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
   const currentUser = req.session.username;
   const otherUser = decodeURIComponent(req.params.otherUser);
+
+  if (database.postgresRequested()) {
+    const exists = await postgresStore.userExists(otherUser);
+    if (!exists) return res.status(404).json({ error: "User not found" });
+
+    await postgresStore.markDirectConversationRead({ currentUser, otherUser });
+    const page = await postgresStore.listDirectHistory({
+      currentUser,
+      otherUser,
+      limit: req.query.limit,
+      cursor: req.query.cursor
+    });
+    attachCursorHeaders(res, page.pagination);
+    return res.json(page.items);
+  }
+
   const users = loadUsers();
   if (!users[otherUser]) {
     return res.status(404).json({ error: "User not found" });
@@ -1367,11 +2048,95 @@ app.get("/api/directs/history/:otherUser", (req, res) => {
     }
   });
   
-  if (updated) saveDirects(directs);
-  
+  if (updated) {
+    saveDirects(directs);
+    emitDirectStatusRealtime({ reader: currentUser, sender: otherUser, status: "read", readAt: Date.now() });
+  }
+
+  const pagination = getPagination(req, { defaultLimit: 50, maxLimit: 200 });
+  if (pagination.enabled) {
+    const page = paginateArray(chat, pagination);
+    attachPaginationHeaders(res, page.meta);
+    return res.json(page.items);
+  }
+
   // Send the full message object including reactions
-  res.json(chat);
-});
+  res.json(chat.map(msg => normalizeDirectMessage(msg, users)));
+}));
+
+app.get("/api/directs/summary", api.asyncHandler(async (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+
+  const currentUser = req.session.username;
+  if (database.postgresRequested()) {
+    return res.json(await postgresStore.getDirectSummary({ currentUser }));
+  }
+
+  const directs = loadDirects();
+  const conversationMap = new Map();
+  let unreadMessages = 0;
+
+  directs.forEach(msg => {
+    if (msg.groupId) return;
+    if (msg.sender !== currentUser && msg.receiver !== currentUser) return;
+
+    const otherUser = msg.sender === currentUser ? msg.receiver : msg.sender;
+    const record = conversationMap.get(otherUser) || {
+      username: otherUser,
+      unreadCount: 0,
+      latestTimestamp: 0
+    };
+
+    if (msg.sender === otherUser && msg.receiver === currentUser && msg.status !== "read") {
+      record.unreadCount += 1;
+      unreadMessages += 1;
+    }
+    record.latestTimestamp = Math.max(record.latestTimestamp, Number(msg.timestamp) || 0);
+    conversationMap.set(otherUser, record);
+  });
+
+  const conversations = Array.from(conversationMap.values());
+  res.json({
+    conversations: conversations.length,
+    unreadConversations: conversations.filter(item => item.unreadCount > 0).length,
+    unreadMessages,
+    latestConversationAt: conversations.reduce((latest, item) => Math.max(latest, item.latestTimestamp), 0),
+    generatedAt: Date.now()
+  });
+}));
+
+app.get("/api/directs/search/:otherUser", api.asyncHandler(async (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+
+  const currentUser = req.session.username;
+  const otherUser = decodeURIComponent(req.params.otherUser);
+  const query = sanitizeHtml(String(req.query.q || "").trim(), { allowedTags: [], allowedAttributes: {} });
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 30, 1), 100);
+  const users = loadUsers();
+
+  if (database.postgresRequested()) {
+    const exists = await postgresStore.userExists(otherUser);
+    if (!exists) return res.status(404).json({ error: "User not found" });
+    if (query.length < 2) return res.json({ query, count: 0, results: [] });
+    const results = await postgresStore.searchDirectHistory({ currentUser, otherUser, query, limit });
+    return res.json({ query, count: results.length, results });
+  }
+
+  if (!users[otherUser]) return res.status(404).json({ error: "User not found" });
+  if (query.length < 2) return res.json({ query, count: 0, results: [] });
+
+  const normalizedQuery = query.toLowerCase();
+  const directs = loadDirects();
+  const results = directs
+    .filter(msg => isSameDirectConversation(msg, currentUser, otherUser))
+    .filter(msg => `${msg.message || ""} ${msg.mediaName || ""}`.toLowerCase().includes(normalizedQuery))
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+    .slice(0, limit)
+    .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+    .map(msg => normalizeDirectMessage(msg, users));
+
+  res.json({ query, count: results.length, results });
+}));
 
 app.post("/api/directs/read", (req, res) => {
     if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
@@ -1387,6 +2152,7 @@ app.post("/api/directs/read", (req, res) => {
         }
     });
     if (updated) saveDirects(directs);
+    if (updated) emitDirectStatusRealtime({ reader: req.session.username, sender: otherUser, status: "read", readAt: Date.now() });
     res.json({ success: true });
 });
 
@@ -1430,8 +2196,51 @@ app.post("/api/directs/react", (req, res) => {
     }
     
     saveDirects(directs);
+    emitDirectMutationRealtime(directs[msgIndex], "message:reaction", loadUsers());
     res.json(directs[msgIndex].reactions);
 });
+
+app.post("/api/directs/edit", api.asyncHandler(async (req, res) => {
+    if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+
+    const parsedMessageId = Number(req.body.messageId);
+    const nextMessage = sanitizeHtml(String(req.body.newMessage || "").trim(), { allowedTags: [], allowedAttributes: {} });
+
+    if (!Number.isFinite(parsedMessageId)) return res.status(400).json({ error: "Invalid message" });
+    if (!nextMessage) return res.status(400).json({ error: "Message empty" });
+    if (nextMessage.length > 2000) return res.status(400).json({ error: "Message too long" });
+
+    if (database.postgresRequested()) {
+        const updated = await postgresStore.editDirectMessage({
+            currentUser: req.session.username,
+            messageId: req.body.messageId,
+            body: nextMessage
+        });
+        if (!updated) return res.status(404).json({ error: "Message not found" });
+        return res.json(updated);
+    }
+
+    const directs = loadDirects();
+    const users = loadUsers();
+    const msgIndex = directs.findIndex(m => m.id === parsedMessageId);
+    if (msgIndex === -1) return res.status(404).json({ error: "Message not found" });
+
+    const targetMessage = directs[msgIndex];
+    if (targetMessage.sender !== req.session.username) {
+        return res.status(403).json({ error: "Only the sender can edit this message" });
+    }
+    if (!userCanAccessDirectMessage(targetMessage, req.session.username)) {
+        return res.status(403).json({ error: "Forbidden" });
+    }
+
+    directs[msgIndex].message = nextMessage;
+    directs[msgIndex].edited = true;
+    directs[msgIndex].editedAt = Date.now();
+
+    saveDirects(directs);
+    emitDirectMutationRealtime(directs[msgIndex], "message:edited", users);
+    res.json(normalizeDirectMessage(directs[msgIndex], users));
+}));
 
 // Add this to server.js
 app.delete("/api/directs/:id", (req, res) => {
@@ -1447,8 +2256,10 @@ app.delete("/api/directs/:id", (req, res) => {
         return res.status(403).json({ error: "Forbidden" });
     }
     
+    const deletedMessage = directs[index];
     directs.splice(index, 1);
     saveDirects(directs);
+    emitMessageDeletedRealtime(deletedMessage);
     res.json({ success: true });
 });
 
@@ -1527,14 +2338,79 @@ app.post("/api/messages/retweet/:id", (req, res) => {
       message: "Post Re-Slashed!"
     });
   }
-if (idx === -1 && msg.username !== req.session.username) {
-  addNotification(msg.username, 'retweet', req.session.username, msg.id);
-  // ADD THIS:
-  const analysis = aiAnalysisCache.get(msg.id)?.data;
-  if (analysis?.topics) {
-    updateUserTopicPreference(req.session.username, analysis.topics, 2.5);
+});
+
+app.post("/api/messages/quote/:id", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+
+  const originalPostId = parseInt(req.params.id, 10);
+  const messages = loadMessages();
+  const users = loadUsers();
+  const originalPost = messages.find(m => m.id === originalPostId);
+  const message = sanitizeHtml((req.body.message || "").trim(), { allowedTags: [], allowedAttributes: {} });
+
+  if (!originalPost) return res.status(404).json({ error: "Post not found" });
+  if (!message) return res.status(400).json({ error: "Quote text is required" });
+  if (message.length > 280) return res.status(400).json({ error: "Quote must be 280 characters or less" });
+
+  const quotePost = {
+    id: Date.now(),
+    username: req.session.username,
+    message,
+    timestamp: Date.now(),
+    imageUrl: null,
+    isVideo: false,
+    pfp: users[req.session.username]?.pfp || null,
+    parentId: null,
+    quoteOf: originalPostId,
+    isQuote: true,
+    likes: [],
+    saves: [],
+    retweets: [],
+    views: 0,
+    replyCount: 0
+  };
+
+  messages.push(quotePost);
+  saveMessages(messages);
+
+  if (originalPost.username !== req.session.username) {
+    addNotification(originalPost.username, 'quote', req.session.username, originalPost.id);
   }
-}
+
+  res.json({
+    ...quotePost,
+    quotedPost: {
+      id: originalPost.id,
+      username: originalPost.username,
+      message: originalPost.message,
+      imageUrl: originalPost.imageUrl,
+      isVideo: originalPost.isVideo || false,
+      timestamp: originalPost.timestamp,
+      pfp: users[originalPost.username]?.pfp || originalPost.pfp || null
+    }
+  });
+});
+
+app.post("/api/messages/pin/:id", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+
+  const postId = parseInt(req.params.id, 10);
+  const messages = loadMessages();
+  const users = loadUsers();
+  const msg = messages.find(m => m.id === postId);
+  const user = users[req.session.username];
+
+  if (!msg) return res.status(404).json({ error: "Post not found" });
+  if (!user || msg.username !== req.session.username || msg.parentId) {
+    return res.status(403).json({ error: "Only your own top-level posts can be pinned" });
+  }
+
+  const alreadyPinned = String(user.pinnedPostId || "") === String(postId);
+  user.pinnedPostId = alreadyPinned ? null : postId;
+  saveUsers(users);
+
+  res.json({ pinned: !alreadyPinned, pinnedPostId: user.pinnedPostId });
 });
 
 app.get("/api/retweeted-posts", (req, res) => {
@@ -1561,11 +2437,16 @@ app.get("/api/check-user/:username", (req, res) => {
   }
 });
 
-app.post("/api/directs/send", (req, res) => {
+app.post("/api/directs/send", upload.single("media"), (req, res) => {
   if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
   
-  const { receiver, message, groupId } = req.body; // Added groupId support
+  const { receiver, message, groupId, replyTo } = req.body; // Added groupId support
   const users = loadUsers();
+  const directs = loadDirects();
+  const hasMedia = !!req.file;
+  const mediaUrl = hasMedia ? `/uploads/${req.file.filename}` : null;
+  const isVideo = hasMedia && req.file.mimetype.startsWith("video/");
+  const mediaName = hasMedia ? sanitizeHtml(req.file.originalname || "Attachment", { allowedTags: [], allowedAttributes: {} }) : null;
   
   // Handle Group Messages
   if (groupId) {
@@ -1576,21 +2457,27 @@ app.post("/api/directs/send", (req, res) => {
         return res.status(403).json({ error: "Not a member" });
     }
     
-    const sanitizedMessage = sanitizeHtml(message, { allowedTags: [], allowedAttributes: {} });
+    const sanitizedMessage = sanitizeHtml(message || "", { allowedTags: [], allowedAttributes: {} });
+    if (!sanitizedMessage.trim() && !hasMedia) return res.status(400).json({ error: "Message empty" });
+    const replyPreview = buildDirectReplyPreview(directs, replyTo, req.session.username, null, groupId);
     const newDm = {
       id: Date.now(),
       groupId: groupId,
       sender: req.session.username,
       senderPfp: users[req.session.username]?.pfp || null,
       message: sanitizedMessage,
+      mediaUrl,
+      isVideo,
+      mediaName,
       timestamp: Date.now(),
       status: "sent",
+      replyTo: replyPreview,
       reactions: {} // <--- CRITICAL FIX: Initialize reactions
     };
     
-    const directs = loadDirects();
     directs.push(newDm);
     saveDirects(directs);
+    emitDirectRealtime(newDm, users);
     return res.json(newDm);
   }
   
@@ -1598,26 +2485,38 @@ app.post("/api/directs/send", (req, res) => {
   if (!users[receiver]) {
     return res.status(404).json({ error: "User not found" });
   }
-  if (!message || !message.trim()) return res.status(400).json({ error: "Message empty" });
+  const senderUser = users[req.session.username];
+  const receiverUser = users[receiver];
+  ensureUserSafetyLists(senderUser);
+  ensureUserSafetyLists(receiverUser);
+  if (senderUser.blockedUsers.includes(receiver) || receiverUser.blockedUsers.includes(req.session.username)) {
+    return res.status(403).json({ error: "You cannot message this user" });
+  }
+  if ((!message || !message.trim()) && !hasMedia) return res.status(400).json({ error: "Message empty" });
   
-  const sanitizedMessage = sanitizeHtml(message, { allowedTags: [], allowedAttributes: {} });
+  const sanitizedMessage = sanitizeHtml(message || "", { allowedTags: [], allowedAttributes: {} });
+  const replyPreview = buildDirectReplyPreview(directs, replyTo, req.session.username, receiver);
   const newDm = {
     id: Date.now(),
     sender: req.session.username,
     receiver: receiver,
     message: sanitizedMessage,
+    mediaUrl,
+    isVideo,
+    mediaName,
     timestamp: Date.now(),
     status: "sent",
+    replyTo: replyPreview,
     reactions: {} // <--- CRITICAL FIX: Initialize reactions
   };
   
-  const directs = loadDirects();
   directs.push(newDm);
   saveDirects(directs);
   
   // Update sender PFP in message
   newDm.pfp = users[req.session.username]?.pfp;
   newDm.senderPfp = users[req.session.username]?.pfp;
+  emitDirectRealtime(newDm, users);
   
   res.json(newDm);
 });
@@ -1838,12 +2737,20 @@ const wafWhitelistPaths = [
 '/api/notifications/unread-count',
 '/api/notifications/mark-read',
 '/api/notifications/mark-all-read',
+'/api/notifications/mark-category-read',
+'/api/notifications/archive',
+'/api/notifications/archive-read',
+'/api/notifications/preferences',
 '/api/notifications/',
 '/api/support/my-tickets',
 '/api/support/ticket/',
 '/api/ban-status',
 '/csrf-token',
 '/api/users/search',
+'/api/search',
+'/api/search/suggest',
+'/api/feed/trending',
+'/api/feed/discovery',
 '/api/check-user',
 '/api/user-info',
 '/api/upload-background',
@@ -1879,6 +2786,8 @@ const wafWhitelistPaths = [
 '/session',
 '/upload-pfp',
 '/api/messages',
+'/api/media/gallery',
+'/api/media/',
 '/api/messages/like/',
 '/api/messages/save/',
 '/api/messages/retweet/',
@@ -1886,6 +2795,11 @@ const wafWhitelistPaths = [
 '/api/update-about',
 '/api/follow/',
 '/api/unfollow/',
+'/api/safety/status/',
+'/api/safety/report-post/',
+'/api/safety/hide-post/',
+'/api/safety/mute/',
+'/api/safety/block/',
 '/api/messages/:id',
 '/api/messages/:id/replies',
 '/api/retweeted-posts',
@@ -1902,10 +2816,17 @@ const wafWhitelistPaths = [
 '/api/support/ticket/:id/respond',
 '/api/support/stats',
 '/api/support/ticket/:id/status',
+'/api/moderation/reports',
+'/api/moderation/reports/',
+'/api/moderation/stats',
 '/api/notifications/',
 '/api/local-pass',
 '/api/change-username',
 '/api/users/all',
+'/api/search',
+'/api/search/suggest',
+'/api/feed/trending',
+'/api/feed/discovery',
 '/api/groups/create',
 '/api/groups/list',
 '/api/groups/',
@@ -2344,6 +3265,154 @@ app.put("/api/support/ticket/:id/status", (req, res) => {
     res.json({ success: true, status });
 });
 
+function requireAdmin(req, res) {
+    if (!req.session.username) {
+        res.status(401).json({ error: "Unauthorized" });
+        return false;
+    }
+    if (!ADMIN_USERS.includes(req.session.username)) {
+        res.status(403).json({ error: "Admin access required" });
+        return false;
+    }
+    return true;
+}
+
+function hydrateSafetyReport(report, messages, users) {
+    const post = messages.find(msg => msg.id === report.postId);
+    return {
+        ...report,
+        post: post ? {
+            id: post.id,
+            username: post.username,
+            message: post.message || "",
+            imageUrl: post.imageUrl || null,
+            isVideo: post.isVideo || false,
+            timestamp: post.timestamp,
+            reportCount: post.reportCount || 0,
+            moderationStatus: post.moderationStatus || "visible",
+            authorPfp: users[post.username]?.pfp || post.pfp || null
+        } : null,
+        authorExists: Boolean(users[report.author]),
+        reporterExists: Boolean(users[report.reporter])
+    };
+}
+
+app.get("/api/moderation/reports", (req, res) => {
+    if (!requireAdmin(req, res)) return;
+
+    const status = String(req.query.status || "all").toLowerCase();
+    const reports = loadSafetyReports();
+    const messages = loadMessages();
+    const users = loadUsers();
+    const filteredReports = status === "all" ? reports : reports.filter(report => (report.status || "open") === status);
+
+    res.json(filteredReports
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+        .map(report => hydrateSafetyReport(report, messages, users)));
+});
+
+app.get("/api/moderation/stats", (req, res) => {
+    if (!requireAdmin(req, res)) return;
+
+    const reports = loadSafetyReports();
+    const byStatus = reports.reduce((acc, report) => {
+        const status = report.status || "open";
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+    }, {});
+    const byReason = reports.reduce((acc, report) => {
+        const reason = report.reason || "other";
+        acc[reason] = (acc[reason] || 0) + 1;
+        return acc;
+    }, {});
+
+    res.json({
+        total: reports.length,
+        open: byStatus.open || 0,
+        reviewing: byStatus.reviewing || 0,
+        resolved: byStatus.resolved || 0,
+        dismissed: byStatus.dismissed || 0,
+        byReason
+    });
+});
+
+app.put("/api/moderation/reports/:id", (req, res) => {
+    if (!requireAdmin(req, res)) return;
+
+    const reportId = Number(req.params.id);
+    const allowedStatuses = new Set(["open", "reviewing", "resolved", "dismissed"]);
+    const allowedActions = new Set(["none", "mark_reviewing", "dismiss", "resolve", "hide_post", "delete_post", "block_author"]);
+    const status = String(req.body.status || "").toLowerCase();
+    const action = String(req.body.action || "none").toLowerCase();
+    const note = sanitizeHtml(String(req.body.note || "").trim(), { allowedTags: [], allowedAttributes: {} }).slice(0, 500);
+
+    if (!Number.isFinite(reportId)) return res.status(400).json({ error: "Invalid report" });
+    if (status && !allowedStatuses.has(status)) return res.status(400).json({ error: "Invalid status" });
+    if (!allowedActions.has(action)) return res.status(400).json({ error: "Invalid action" });
+
+    const reports = loadSafetyReports();
+    const reportIndex = reports.findIndex(report => Number(report.id) === reportId);
+    if (reportIndex === -1) return res.status(404).json({ error: "Report not found" });
+
+    const messages = loadMessages();
+    const users = loadUsers();
+    const report = reports[reportIndex];
+    const postIndex = messages.findIndex(msg => msg.id === report.postId);
+    const post = postIndex >= 0 ? messages[postIndex] : null;
+
+    const logEntry = {
+        admin: req.session.username,
+        action,
+        note,
+        timestamp: Date.now()
+    };
+
+    if (!Array.isArray(report.moderationLog)) report.moderationLog = [];
+    report.moderationLog.push(logEntry);
+    report.reviewedBy = req.session.username;
+    report.reviewedAt = Date.now();
+
+    if (status) report.status = status;
+    if (action === "mark_reviewing") report.status = "reviewing";
+    if (action === "dismiss") report.status = "dismissed";
+    if (action === "resolve") report.status = "resolved";
+
+    if (action === "hide_post") {
+        if (!post) return res.status(404).json({ error: "Post no longer exists" });
+        post.moderationStatus = "hidden";
+        post.hiddenByAdmin = true;
+        post.hiddenAt = Date.now();
+        report.status = "resolved";
+        saveMessages(messages);
+    }
+
+    if (action === "delete_post") {
+        if (!post) return res.status(404).json({ error: "Post no longer exists" });
+        if (post.imageUrl) {
+            const fp = path.join(UPLOAD_DIR, path.basename(post.imageUrl));
+            if (fs.existsSync(fp)) fs.unlinkSync(fp);
+        }
+        messages.splice(postIndex, 1);
+        report.status = "resolved";
+        report.deletedPost = true;
+        saveMessages(messages);
+    }
+
+    if (action === "block_author") {
+        const reporter = users[report.reporter];
+        if (!reporter || !users[report.author]) return res.status(404).json({ error: "Reporter or author no longer exists" });
+        ensureUserSafetyLists(reporter);
+        if (!reporter.blockedUsers.includes(report.author)) reporter.blockedUsers.push(report.author);
+        reporter.following = (reporter.following || []).filter(username => username !== report.author);
+        users[report.author].followers = (users[report.author].followers || []).filter(username => username !== report.reporter);
+        report.status = "resolved";
+        saveUsers(users);
+    }
+
+    saveSafetyReports(reports);
+    res.json({ success: true, report: hydrateSafetyReport(report, loadMessages(), loadUsers()) });
+});
+
 const NOTIFICATIONS_FILE = path.join(DATA_DIR, "notifications.json");
 
 function loadNotifications() {
@@ -2354,30 +3423,66 @@ function saveNotifications(data) {
   writeJsonFileAtomic(NOTIFICATIONS_FILE, data);
 }
 
+function ensureNotificationPreferences(user) {
+  if (!user.settings || typeof user.settings !== "object") user.settings = {};
+  if (!user.settings.notificationPrefs || typeof user.settings.notificationPrefs !== "object") {
+    user.settings.notificationPrefs = {};
+  }
+  const prefs = user.settings.notificationPrefs;
+  if (!Array.isArray(prefs.mutedTypes)) prefs.mutedTypes = [];
+  if (!Array.isArray(prefs.mutedCategories)) prefs.mutedCategories = [];
+  if (prefs.soundEnabled === undefined) prefs.soundEnabled = true;
+  if (prefs.showUnreadOnly === undefined) prefs.showUnreadOnly = false;
+  return prefs;
+}
+
+function notificationAllowedForUser(user, type, category) {
+  if (!user) return false;
+  if (user.settings?.notificationsEnabled === false) return false;
+  const prefs = ensureNotificationPreferences(user);
+  return !prefs.mutedTypes.includes(type) && !prefs.mutedCategories.includes(category);
+}
+
 function addNotification(user, type, fromUser, postId = null, extraInfo = {}) {
   if (user === fromUser) return;
   
   const notifications = loadNotifications();
   const users = loadUsers(); // Add this line
+  const targetUser = users[user];
   let message = "";
+  let category = "social";
   
   switch(type) {
     case 'reply':
       message = `replied to your post`;
+      category = "conversation";
       break;
     case 'like':
       message = `liked your post`;
+      category = "engagement";
       break;
     case 'retweet':
       message = `re-slashed your post`;
+      category = "engagement";
+      break;
+    case 'quote':
+      message = `quoted your post`;
+      category = "conversation";
       break;
     case 'follow':
       message = `started following you`;
+      category = "social";
       break;
     case 'mention':
       message = `mentioned you in a post`;
+      category = "conversation";
       break;
+    default:
+      message = extraInfo.message || "sent you a notification";
+      category = extraInfo.category || "system";
   }
+
+  if (!notificationAllowedForUser(targetUser, type, category)) return;
   
   // Get the sender's pfp
   const fromUserPfp = users[fromUser]?.pfp || null;
@@ -2390,31 +3495,98 @@ function addNotification(user, type, fromUser, postId = null, extraInfo = {}) {
     fromUserPfp: fromUserPfp, // Add this line
     postId: postId,
     message: message,
+    category,
+    actionUrl: type === "follow"
+      ? `/pf.html?user=${encodeURIComponent(fromUser)}`
+      : (postId ? `/post.html?id=${encodeURIComponent(postId)}` : null),
     read: false,
+    archived: false,
     timestamp: Date.now(),
     ...extraInfo
   };
   
   notifications.unshift(notification);
   saveNotifications(notifications);
+  emitNotificationRealtime(notification);
+}
+
+function normalizeNotification(notification, users = null) {
+  const fromUser = notification.fromUser || notification.actor || null;
+  const postId = notification.postId || null;
+  return {
+    ...notification,
+    id: notification.id,
+    type: notification.type || "system",
+    category: notification.category || (postId ? "conversation" : "social"),
+    fromUser,
+    fromUserPfp: notification.fromUserPfp || (users && fromUser ? users[fromUser]?.pfp : null) || null,
+    postId,
+    actionUrl: notification.actionUrl || (
+      notification.type === "follow" && fromUser
+        ? `/pf.html?user=${encodeURIComponent(fromUser)}`
+        : (postId ? `/post.html?id=${encodeURIComponent(postId)}` : null)
+    ),
+    read: notification.read === true,
+    archived: notification.archived === true,
+    timestamp: notification.timestamp || Date.now()
+  };
+}
+
+function notificationSummary(notifications) {
+  const summary = {
+    total: notifications.length,
+    unread: notifications.filter(n => !n.read).length,
+    byType: {},
+    byCategory: {}
+  };
+
+  notifications.forEach(notification => {
+    const type = notification.type || "system";
+    const category = notification.category || "social";
+    summary.byType[type] = (summary.byType[type] || 0) + 1;
+    summary.byCategory[category] = (summary.byCategory[category] || 0) + 1;
+  });
+
+  return summary;
 }
 
 app.get("/api/notifications", (req, res) => {
   if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
   
-  const notifications = loadNotifications();
-  const userNotifications = notifications
+  const limit = Math.min(Number.parseInt(req.query.limit, 10) || 50, 100);
+  const typeFilter = String(req.query.type || "").trim();
+  const unreadOnly = req.query.unread === "true";
+  const includeArchived = req.query.archived === "true";
+  const users = loadUsers();
+  let userNotifications = loadNotifications()
     .filter(n => n.user === req.session.username)
-    .slice(0, 50);
+    .map(n => normalizeNotification(n, users));
+
+  if (!includeArchived) userNotifications = userNotifications.filter(n => !n.archived);
+  if (typeFilter) userNotifications = userNotifications.filter(n => n.type === typeFilter || n.category === typeFilter);
+  if (unreadOnly) userNotifications = userNotifications.filter(n => !n.read);
+  userNotifications = userNotifications.slice(0, limit);
   
   res.json(userNotifications);
+});
+
+app.get("/api/notifications/summary", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+
+  const users = loadUsers();
+  const notifications = loadNotifications()
+    .filter(n => n.user === req.session.username)
+    .filter(n => !n.archived)
+    .map(n => normalizeNotification(n, users));
+
+  res.json(notificationSummary(notifications));
 });
 
 app.get("/api/notifications/unread-count", (req, res) => {
   if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
   
   const notifications = loadNotifications();
-  const unreadCount = notifications.filter(n => n.user === req.session.username && !n.read).length;
+  const unreadCount = notifications.filter(n => n.user === req.session.username && !n.read && !n.archived).length;
   
   res.json({ count: unreadCount });
 });
@@ -2422,11 +3594,11 @@ app.get("/api/notifications/unread-count", (req, res) => {
 app.post("/api/notifications/mark-read", (req, res) => {
   if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
   
-  const { notificationIds } = req.body;
+  const notificationIds = Array.isArray(req.body.notificationIds) ? req.body.notificationIds.map(String) : [];
   const notifications = loadNotifications();
   
   notifications.forEach(n => {
-    if (n.user === req.session.username && notificationIds.includes(n.id)) {
+    if (n.user === req.session.username && notificationIds.includes(String(n.id))) {
       n.read = true;
     }
   });
@@ -2448,6 +3620,99 @@ app.post("/api/notifications/mark-all-read", (req, res) => {
   
   saveNotifications(notifications);
   res.json({ success: true });
+});
+
+app.post("/api/notifications/mark-category-read", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+
+  const target = String(req.body.category || req.body.type || "").trim();
+  if (!target) return res.status(400).json({ error: "Category or type is required" });
+
+  const notifications = loadNotifications();
+  notifications.forEach(n => {
+    if (n.user === req.session.username && (n.category === target || n.type === target)) {
+      n.read = true;
+    }
+  });
+  saveNotifications(notifications);
+  res.json({ success: true });
+});
+
+app.post("/api/notifications/archive", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+
+  const notificationIds = Array.isArray(req.body.notificationIds) ? req.body.notificationIds.map(String) : [];
+  if (notificationIds.length === 0) return res.status(400).json({ error: "No notifications selected" });
+
+  const notifications = loadNotifications();
+  notifications.forEach(n => {
+    if (n.user === req.session.username && notificationIds.includes(String(n.id))) {
+      n.archived = true;
+      n.read = true;
+    }
+  });
+  saveNotifications(notifications);
+  res.json({ success: true });
+});
+
+app.post("/api/notifications/archive-read", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+
+  const notifications = loadNotifications();
+  let archived = 0;
+  notifications.forEach(n => {
+    if (n.user === req.session.username && n.read && !n.archived) {
+      n.archived = true;
+      archived += 1;
+    }
+  });
+  saveNotifications(notifications);
+  res.json({ success: true, archived });
+});
+
+app.get("/api/notifications/preferences", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+
+  const users = loadUsers();
+  const user = users[req.session.username];
+  if (!user) return res.status(404).json({ error: "User not found" });
+  const prefs = ensureNotificationPreferences(user);
+  saveUsers(users);
+  res.json({
+    notificationsEnabled: user.settings?.notificationsEnabled !== false,
+    ...prefs
+  });
+});
+
+app.put("/api/notifications/preferences", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+
+  const users = loadUsers();
+  const user = users[req.session.username];
+  if (!user) return res.status(404).json({ error: "User not found" });
+  const prefs = ensureNotificationPreferences(user);
+
+  if (req.body.notificationsEnabled !== undefined) {
+    user.settings.notificationsEnabled = req.body.notificationsEnabled === true;
+  }
+  if (Array.isArray(req.body.mutedTypes)) {
+    prefs.mutedTypes = req.body.mutedTypes.map(String).slice(0, 20);
+  }
+  if (Array.isArray(req.body.mutedCategories)) {
+    prefs.mutedCategories = req.body.mutedCategories.map(String).slice(0, 20);
+  }
+  if (req.body.soundEnabled !== undefined) {
+    prefs.soundEnabled = req.body.soundEnabled === true;
+  }
+  if (req.body.showUnreadOnly !== undefined) {
+    prefs.showUnreadOnly = req.body.showUnreadOnly === true;
+  }
+
+  saveUsers(users);
+  res.json({
+    notificationsEnabled: user.settings.notificationsEnabled !== false,
+    ...prefs
+  });
 });
 
 app.delete("/api/notifications/:id", (req, res) => {
@@ -2716,21 +3981,26 @@ app.post("/api/groups/create", (req, res) => {
   
   const groups = loadGroups();
   const users = loadUsers();
+  const currentUser = req.session.username;
+  const canCreateGroup = users[currentUser]?.isPremium === true || ADMIN_USERS.includes(currentUser);
+  if (!canCreateGroup) {
+    return res.status(403).json({ error: "Only premium members can create groups" });
+  }
   
   const groupMembers = members.map(m => ({
     username: m,
     pfp: users[m]?.pfp || null
   }));
   groupMembers.push({
-    username: req.session.username,
-    pfp: users[req.session.username]?.pfp || null
+    username: currentUser,
+    pfp: users[currentUser]?.pfp || null
   });
   
   const newGroup = {
     id: "group_" + Date.now(),
     name: name,
     members: groupMembers,
-    createdBy: req.session.username,
+    createdBy: currentUser,
     createdAt: Date.now()
   };
   
@@ -2786,6 +4056,7 @@ app.post("/api/groups/send", (req, res) => {
   const directs = loadDirects();
   directs.push(newDm);
   saveDirects(directs);
+  emitDirectRealtime(newDm, users);
   
   res.json(newDm);
 });
@@ -2946,10 +4217,11 @@ app.get("/api/messages/user/:username", (req, res) => {
   const targetUser = decodeURIComponent(req.params.username);
   const messages = loadMessages();
   const users = loadUsers();
+  const pinnedPostId = users[targetUser]?.pinnedPostId || null;
   
   // Filter messages by username and add user info
   const userPosts = messages
-    .filter(msg => msg.username === targetUser && !msg.parentId)
+    .filter(msg => msg.username === targetUser && !msg.parentId && msg.moderationStatus !== "hidden")
     .map(msg => {
       if(!msg.saves) msg.saves = [];
       if(!msg.likes) msg.likes = [];
@@ -2957,14 +4229,266 @@ app.get("/api/messages/user/:username", (req, res) => {
       
       const user = users[msg.username];
       msg.isPremium = user?.isPremium || false;
+      msg.isPinned = pinnedPostId && String(msg.id) === String(pinnedPostId);
+
+      if (msg.isQuote && msg.quoteOf) {
+        const quotedPost = messages.find(m => m.id === msg.quoteOf);
+        if (quotedPost) {
+          msg.quotedPost = {
+            id: quotedPost.id,
+            username: quotedPost.username,
+            message: quotedPost.message,
+            imageUrl: quotedPost.imageUrl,
+            isVideo: quotedPost.isVideo || false,
+            timestamp: quotedPost.timestamp,
+            pfp: users[quotedPost.username]?.pfp || quotedPost.pfp || null
+          };
+        }
+      }
       
       return msg;
     });
   
   // Sort by timestamp (newest first)
-  userPosts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  userPosts.sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+    return new Date(b.timestamp) - new Date(a.timestamp);
+  });
   
   res.json(userPosts);
+});
+
+function buildProfilePostPayload(msg, users, messages) {
+  const post = { ...msg };
+  post.likes = Array.isArray(post.likes) ? post.likes : [];
+  post.saves = Array.isArray(post.saves) ? post.saves : [];
+  post.retweets = Array.isArray(post.retweets) ? post.retweets : [];
+  post.views = Number.isFinite(post.views) ? post.views : 0;
+  post.replyCount = messages.filter(item => item.parentId === post.id && item.moderationStatus !== "hidden").length;
+  post.quoteCount = messages.filter(item => item.isQuote && item.quoteOf === post.id && item.moderationStatus !== "hidden").length;
+  post.pfp = users[post.username]?.pfp || post.pfp || null;
+  post.isPremium = users[post.username]?.isPremium === true;
+
+  if (post.isQuote && post.quoteOf) {
+    const quotedPost = messages.find(item => item.id === post.quoteOf);
+    if (quotedPost) {
+      post.quotedPost = {
+        id: quotedPost.id,
+        username: quotedPost.username,
+        message: quotedPost.message,
+        imageUrl: quotedPost.imageUrl,
+        isVideo: quotedPost.isVideo || false,
+        timestamp: quotedPost.timestamp,
+        pfp: users[quotedPost.username]?.pfp || quotedPost.pfp || null
+      };
+    }
+  }
+
+  return post;
+}
+
+function profileEngagementScore(post) {
+  const likes = Array.isArray(post.likes) ? post.likes.length : Number(post.likes || 0);
+  const saves = Array.isArray(post.saves) ? post.saves.length : Number(post.saves || 0);
+  const retweets = Array.isArray(post.retweets) ? post.retweets.length : Number(post.retweets || 0);
+  const replies = Number(post.replyCount || 0);
+  const quotes = Number(post.quoteCount || 0);
+  const views = Number(post.views || 0);
+  return (likes * 3) + (retweets * 4) + (saves * 2) + (replies * 2) + quotes + Math.floor(views / 20);
+}
+
+function profileTimestampValue(timestamp) {
+  const numeric = Number(timestamp || 0);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  const parsed = Date.parse(timestamp);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function extractProfileTags(posts) {
+  const tags = new Map();
+  posts.forEach(post => {
+    String(post.message || "").replace(/#([\p{L}\p{N}_]+)/gu, (_, rawTag) => {
+      const tag = rawTag.toLowerCase();
+      tags.set(tag, (tags.get(tag) || 0) + 1);
+      return "";
+    });
+  });
+  return Array.from(tags.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 6)
+    .map(([tag, count]) => ({ tag, count }));
+}
+
+function buildProfileConnection(username, users, currentUser = null) {
+  const user = users[username] || {};
+  return {
+    username,
+    pfp: user.pfp || null,
+    about: user.about || "No bio yet.",
+    isPremium: user.isPremium === true,
+    followers: (user.followers || []).length,
+    following: (user.following || []).length,
+    isFollowing: currentUser ? (user.followers || []).includes(currentUser) : false
+  };
+}
+
+app.get("/api/profile/:username", (req, res) => {
+  const targetUser = decodeURIComponent(req.params.username);
+  const users = loadUsers();
+  const user = users[targetUser];
+
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  const currentUser = req.session?.username || null;
+  const messages = loadMessages();
+  const pinnedPostId = user.pinnedPostId || null;
+  const allUserPosts = messages
+    .filter(msg => msg.username === targetUser && msg.moderationStatus !== "hidden")
+    .map(msg => buildProfilePostPayload(msg, users, messages));
+
+  const posts = allUserPosts
+    .filter(msg => !msg.parentId)
+    .map(msg => ({ ...msg, isPinned: pinnedPostId && String(msg.id) === String(pinnedPostId) }))
+    .sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return profileTimestampValue(b.timestamp) - profileTimestampValue(a.timestamp);
+    });
+
+  const replies = allUserPosts
+    .filter(msg => msg.parentId)
+    .sort((a, b) => profileTimestampValue(b.timestamp) - profileTimestampValue(a.timestamp));
+
+  const media = posts
+    .filter(msg => msg.imageUrl)
+    .sort((a, b) => profileTimestampValue(b.timestamp) - profileTimestampValue(a.timestamp));
+
+  const liked = messages
+    .filter(msg => msg.moderationStatus !== "hidden" && Array.isArray(msg.likes) && msg.likes.includes(targetUser))
+    .map(msg => buildProfilePostPayload(msg, users, messages))
+    .sort((a, b) => profileTimestampValue(b.timestamp) - profileTimestampValue(a.timestamp));
+
+  const saved = currentUser === targetUser
+    ? messages
+      .filter(msg => msg.moderationStatus !== "hidden" && Array.isArray(msg.saves) && msg.saves.includes(targetUser))
+      .map(msg => buildProfilePostPayload(msg, users, messages))
+      .sort((a, b) => profileTimestampValue(b.timestamp) - profileTimestampValue(a.timestamp))
+    : [];
+
+  const totalLikes = posts.reduce((sum, post) => sum + post.likes.length, 0);
+  const totalViews = posts.reduce((sum, post) => sum + Number(post.views || 0), 0);
+  const totalReplies = posts.reduce((sum, post) => sum + Number(post.replyCount || 0), 0);
+  const pinnedPost = posts.find(post => post.isPinned) || null;
+  const highlights = posts
+    .map(post => ({ ...post, profileScore: profileEngagementScore(post) }))
+    .filter(post => post.profileScore > 0 || post.imageUrl)
+    .sort((a, b) => b.profileScore - a.profileScore || profileTimestampValue(b.timestamp) - profileTimestampValue(a.timestamp))
+    .slice(0, 4);
+  const recentActivePost = [...allUserPosts].sort((a, b) => profileTimestampValue(b.timestamp) - profileTimestampValue(a.timestamp))[0] || null;
+  const followersPreview = (user.followers || [])
+    .filter(name => users[name])
+    .slice(0, 8)
+    .map(name => buildProfileConnection(name, users, currentUser));
+  const followingPreview = (user.following || [])
+    .filter(name => users[name])
+    .slice(0, 8)
+    .map(name => buildProfileConnection(name, users, currentUser));
+
+  res.json({
+    user: {
+      username: targetUser,
+      pfp: user.pfp || null,
+      banner: user.bannerImage || user.banner || null,
+      about: user.about || "No bio yet.",
+      followers: user.followers || [],
+      following: user.following || [],
+      isPremium: user.isPremium === true,
+      joinedAt: user.joinedAt || user.createdAt || null,
+      isOwnProfile: currentUser === targetUser,
+      isFollowing: currentUser ? (user.followers || []).includes(currentUser) : false
+    },
+    stats: {
+      followers: (user.followers || []).length,
+      following: (user.following || []).length,
+      posts: posts.length,
+      replies: replies.length,
+      media: media.length,
+      likes: totalLikes,
+      views: totalViews
+    },
+    activity: {
+      joinedAt: user.joinedAt || user.createdAt || null,
+      lastPostAt: recentActivePost?.timestamp || null,
+      totalViews,
+      totalLikes,
+      totalReplies,
+      totalMedia: media.length,
+      topTags: extractProfileTags(posts)
+    },
+    featured: {
+      pinnedPost,
+      highlights,
+      followersPreview,
+      followingPreview
+    },
+    tabs: {
+      posts,
+      replies,
+      media,
+      likes: liked,
+      saved
+    }
+  });
+});
+
+app.get("/api/profile/:username/connections", (req, res) => {
+  const targetUser = decodeURIComponent(req.params.username);
+  const type = req.query.type === "following" ? "following" : "followers";
+  const users = loadUsers();
+  const user = users[targetUser];
+
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  const currentUser = req.session?.username || null;
+  const source = Array.isArray(user[type]) ? user[type] : [];
+  const connections = source
+    .filter(name => users[name])
+    .map(name => buildProfileConnection(name, users, currentUser));
+
+  res.json({
+    type,
+    username: targetUser,
+    count: connections.length,
+    connections
+  });
+});
+
+app.get("/api/posts/liked-by/:username", (req, res) => {
+  const targetUser = decodeURIComponent(req.params.username);
+  const users = loadUsers();
+  if (!users[targetUser]) return res.status(404).json({ error: "User not found" });
+  const messages = loadMessages();
+  const liked = messages
+    .filter(msg => msg.moderationStatus !== "hidden" && Array.isArray(msg.likes) && msg.likes.includes(targetUser))
+    .map(msg => buildProfilePostPayload(msg, users, messages))
+    .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
+  res.json(liked);
+});
+
+app.get("/api/posts/saved-by/:username", (req, res) => {
+  const targetUser = decodeURIComponent(req.params.username);
+  if (!req.session?.username || req.session.username !== targetUser) {
+    return res.status(403).json({ error: "Saved posts are private" });
+  }
+  const users = loadUsers();
+  if (!users[targetUser]) return res.status(404).json({ error: "User not found" });
+  const messages = loadMessages();
+  const saved = messages
+    .filter(msg => msg.moderationStatus !== "hidden" && Array.isArray(msg.saves) && msg.saves.includes(targetUser))
+    .map(msg => buildProfilePostPayload(msg, users, messages))
+    .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
+  res.json(saved);
 });
 
 
@@ -3405,67 +4929,232 @@ STRICT IDENTITY RULES:
 
 // --- End AI Integration ---
 
-// --- Global Search Endpoint ---
-app.get("/api/search", (req, res) => {
-  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
-  
-  const query = req.query.q;
-  const lowerQuery = query ? query.toLowerCase() : "";
-  
+const SEARCH_STOP_WORDS = new Set([
+  "the", "and", "for", "you", "your", "with", "that", "this", "from", "have", "has", "are", "was", "were",
+  "but", "not", "all", "can", "just", "into", "about", "what", "when", "where", "there", "their", "they",
+  "will", "would", "should", "could", "been", "being", "more", "most", "some", "than", "then"
+]);
+
+function extractSearchHashtags(text) {
+  return Array.from(String(text || "").matchAll(/#([\p{L}\p{N}_-]+)/gu))
+    .map(match => match[1].toLowerCase())
+    .filter(Boolean);
+}
+
+function buildSearchContext(currentUser) {
   const users = loadUsers();
   const messages = loadMessages();
-  const currentUser = req.session.username;
+  const safeMessages = (Array.isArray(messages) ? messages : []).filter(msg => msg?.moderationStatus !== "hidden");
+  const replyCounts = new Map();
+  const hashtagMap = new Map();
 
-  // If no query, return top 2 most followed users
+  safeMessages.forEach(msg => {
+    if (msg.parentId) replyCounts.set(String(msg.parentId), (replyCounts.get(String(msg.parentId)) || 0) + 1);
+    if (!msg.parentId) {
+      extractSearchHashtags(msg.message).forEach(tag => {
+        const record = hashtagMap.get(tag) || { tag, count: 0, engagement: 0, latestTimestamp: 0 };
+        record.count += 1;
+        record.engagement += (msg.likes || []).length + ((msg.retweets || []).length * 2) + (msg.saves || []).length;
+        record.latestTimestamp = Math.max(record.latestTimestamp, Number(msg.timestamp) || 0);
+        hashtagMap.set(tag, record);
+      });
+    }
+  });
+
+  const getReplyCount = postId => replyCounts.get(String(postId)) || 0;
+  const getPostCount = username => safeMessages.filter(m => m.username === username && !m.parentId).length;
+  const toSearchUser = username => ({
+    username,
+    pfp: users[username]?.pfp || null,
+    about: users[username]?.about || "No bio yet.",
+    followers: (users[username]?.followers || []).length,
+    following: (users[username]?.following || []).length,
+    postCount: getPostCount(username),
+    isPremium: users[username]?.isPremium === true,
+    score: ((users[username]?.followers || []).length * 3) + getPostCount(username)
+  });
+  const toSearchPost = msg => {
+    const user = users[msg.username] || {};
+    const replyCount = getReplyCount(msg.id);
+    return {
+      id: msg.id,
+      username: msg.username,
+      pfp: user.pfp || msg.pfp || null,
+      message: msg.message || "",
+      imageUrl: msg.imageUrl || null,
+      isVideo: msg.isVideo || false,
+      timestamp: msg.timestamp,
+      likes: (msg.likes || []).length,
+      retweets: (msg.retweets || []).length,
+      saves: (msg.saves || []).length,
+      views: msg.views || 0,
+      replyCount,
+      hashtags: extractSearchHashtags(msg.message).map(tag => `#${tag}`),
+      isPremium: user.isPremium === true,
+      score: ((msg.likes || []).length * 2) + ((msg.retweets || []).length * 4) + ((msg.saves || []).length * 3) + replyCount + ((msg.views || 0) / 20)
+    };
+  };
+
+  return { users, safeMessages, hashtagMap, currentUser, toSearchUser, toSearchPost };
+}
+
+function sortSearchPosts(posts, sort) {
+  const list = [...posts];
+  if (sort === "latest") return list.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  if (sort === "people") return list.sort((a, b) => String(a.username || "").localeCompare(String(b.username || "")));
+  return list.sort((a, b) => (b.score + ((b.timestamp || 0) / 10000000000000)) - (a.score + ((a.timestamp || 0) / 10000000000000)));
+}
+
+// --- Global Search Endpoint ---
+app.get("/api/search", api.asyncHandler(async (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+  
+  const query = String(req.query.q || "").trim().slice(0, 80);
+  const lowerQuery = query.toLowerCase();
+  const type = String(req.query.type || "all").toLowerCase();
+  const sort = String(req.query.sort || "top").toLowerCase();
+
+  if (database.postgresRequested()) {
+    const paginationLimit = req.query.limit || (query ? 40 : 6);
+    const usersList = query
+      ? await postgresStore.searchUsers({ q: query, currentUser: req.session.username, limit: 20 })
+      : [];
+    const postPage = query
+      ? await postgresStore.searchPosts({ q: query, limit: paginationLimit, cursor: req.query.cursor })
+      : await postgresStore.listHomeFeed({ limit: paginationLimit, cursor: req.query.cursor });
+
+    attachCursorHeaders(res, postPage.pagination);
+    return res.json({
+      query,
+      users: usersList,
+      posts: postPage.items.map(post => ({
+        ...post,
+        likes: post.likes.length,
+        retweets: post.retweets.length,
+        saves: post.saves.length
+      })),
+      pagination: postPage.pagination
+    });
+  }
+  
+  const currentUser = req.session.username;
+  const { users, safeMessages, hashtagMap, toSearchUser, toSearchPost } = buildSearchContext(currentUser);
+  
+  // If no query, return a useful explore default instead of an empty page.
   if (!query || query.trim().length === 0) {
     const sortedUsers = Object.keys(users)
       .filter(username => username !== currentUser)
-      .map(username => ({
-        username: username,
-        pfp: users[username]?.pfp || null,
-        about: users[username]?.about || "No bio yet.",
-        followers: (users[username]?.followers || []).length,
-        postCount: messages.filter(m => m.username === username && !m.parentId).length
-      }))
-      .sort((a, b) => b.followers - a.followers) // Sort by followers descending
-      .slice(0, 2); // Take top 2
+      .map(toSearchUser)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10);
 
-    return res.json({ users: sortedUsers, posts: [] });
+    const topPosts = safeMessages
+      .filter(msg => msg && !msg.parentId)
+      .map(toSearchPost);
+    const sortedPosts = sortSearchPosts(topPosts, sort).slice(0, 12);
+    const hashtags = Array.from(hashtagMap.values())
+      .sort((a, b) => (b.count + b.engagement) - (a.count + a.engagement))
+      .slice(0, 12)
+      .map(item => ({ tag: `#${item.tag}`, count: item.count, score: Math.round(item.count + item.engagement) }));
+
+    return res.json({
+      query,
+      type,
+      sort,
+      users: type === "slashes" || type === "hashtags" ? [] : sortedUsers,
+      posts: type === "users" || type === "hashtags" ? [] : sortedPosts,
+      hashtags: type === "users" || type === "slashes" ? [] : hashtags,
+      summary: {
+        users: sortedUsers.length,
+        posts: sortedPosts.length,
+        hashtags: hashtags.length,
+        mode: "explore"
+      }
+    });
   }
 
   // If query exists, perform search as before
   const usersList = Object.keys(users)
-    .filter(username => 
-      username.toLowerCase().includes(lowerQuery) && 
+    .filter(username => {
+      const about = users[username]?.about || "";
+      return (username.toLowerCase().includes(lowerQuery) || about.toLowerCase().includes(lowerQuery)) && 
       username !== currentUser
-    )
-    .map(username => ({
-      username: username,
-      pfp: users[username]?.pfp || null,
-      about: users[username]?.about || "No bio yet.",
-      followers: (users[username]?.followers || []).length,
-      postCount: messages.filter(m => m.username === username && !m.parentId).length
-    }));
+    })
+    .map(toSearchUser)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20);
 
-  const postsList = messages
-    .filter(msg => !msg.parentId)
-    .filter(msg => 
-      msg.message.toLowerCase().includes(lowerQuery) || 
-      msg.username.toLowerCase().includes(lowerQuery)
-    )
-    .map(msg => {
-      const user = users[msg.username] || {};
-      return {
-        username: msg.username,
-        pfp: user.pfp || null,
-        message: msg.message,
-        timestamp: msg.timestamp,
-        likes: (msg.likes || []).length,
-        retweets: (msg.retweets || []).length
-      };
-    });
+  let postsList = safeMessages
+    .filter(msg => msg && !msg.parentId)
+    .filter(msg => {
+      const text = `${msg.message || ""} ${msg.username || ""}`.toLowerCase();
+      const normalizedHashtagQuery = lowerQuery.startsWith("#") ? lowerQuery.slice(1) : lowerQuery;
+      const hashtags = Array.from(String(msg.message || "").matchAll(/#([\w-]+)/g)).map(match => match[1].toLowerCase());
+      return text.includes(lowerQuery) || hashtags.includes(normalizedHashtagQuery);
+    })
+    .map(toSearchPost);
 
-  res.json({ users: usersList, posts: postsList });
+  postsList = sortSearchPosts(postsList, sort);
+
+  const normalizedHashtagQuery = lowerQuery.startsWith("#") ? lowerQuery.slice(1) : lowerQuery;
+  const hashtagsList = Array.from(hashtagMap.values())
+    .filter(item => item.tag.includes(normalizedHashtagQuery))
+    .sort((a, b) => (b.count + b.engagement) - (a.count + a.engagement))
+    .slice(0, 20)
+    .map(item => ({ tag: `#${item.tag}`, count: item.count, score: Math.round(item.count + item.engagement), latestTimestamp: item.latestTimestamp }));
+
+  const pagination = getPagination(req, { defaultLimit: 40, maxLimit: 100 });
+  const postPage = paginateArray(postsList, pagination);
+  if (pagination.enabled) attachPaginationHeaders(res, postPage.meta);
+  postsList = postPage.items;
+
+  res.json({
+    query,
+    type,
+    sort,
+    users: type === "slashes" || type === "hashtags" ? [] : usersList,
+    posts: type === "users" || type === "hashtags" ? [] : postsList,
+    hashtags: type === "users" || type === "slashes" ? [] : hashtagsList,
+    pagination: pagination.enabled ? postPage.meta : undefined,
+    summary: {
+      users: usersList.length,
+      posts: postsList.length,
+      hashtags: hashtagsList.length,
+      mode: "search"
+    }
+  });
+}));
+
+app.get("/api/search/suggest", (req, res) => {
+  if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
+
+  const query = String(req.query.q || "").trim().slice(0, 60).toLowerCase();
+  const currentUser = req.session.username;
+  const { users, safeMessages, hashtagMap, toSearchUser, toSearchPost } = buildSearchContext(currentUser);
+  if (!query) return res.json({ query, users: [], posts: [], hashtags: [] });
+
+  const normalizedHashtagQuery = query.startsWith("#") ? query.slice(1) : query;
+  const userSuggestions = Object.keys(users)
+    .filter(username => username !== currentUser)
+    .filter(username => username.toLowerCase().includes(query) || String(users[username]?.about || "").toLowerCase().includes(query))
+    .map(toSearchUser)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+
+  const hashtagSuggestions = Array.from(hashtagMap.values())
+    .filter(item => item.tag.includes(normalizedHashtagQuery))
+    .sort((a, b) => (b.count + b.engagement) - (a.count + a.engagement))
+    .slice(0, 6)
+    .map(item => ({ tag: `#${item.tag}`, count: item.count }));
+
+  const postSuggestions = safeMessages
+    .filter(msg => msg && !msg.parentId)
+    .filter(msg => `${msg.message || ""} ${msg.username || ""}`.toLowerCase().includes(query))
+    .map(toSearchPost)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4);
+
+  res.json({ query, users: userSuggestions, posts: postSuggestions, hashtags: hashtagSuggestions });
 });
 
 app.get("/api/feed/discovery", async (req, res) => {
@@ -3477,161 +5166,117 @@ app.get("/api/feed/discovery", async (req, res) => {
       return res.json({ feed: [] });
     }
 
+    if (database.postgresRequested()) {
+      const candidates = (await postgresStore.listDiscoveryCandidates({ limit: 500 })).filter(post => post.moderationStatus !== "hidden");
+      const following = await postgresStore.listFollowing(sessionUser);
+      const rankedFeed = feedRanking.rankDiscoveryFeed(candidates, {
+        currentUser: sessionUser,
+        following,
+        userPrefs: userTopicCache.get(sessionUser) || { topics: {}, totalWeight: 0 },
+        getAnalysis: post => aiAnalysisCache.get(post.id)?.data || extractTopicsFromText(post.message)
+      });
+      const pagination = getPagination(req, { defaultLimit: 50, maxLimit: 100 });
+      const page = paginateArray(rankedFeed.map(post => feedRanking.stripRankDebug(post, req.query.debugFeed === "true")), pagination);
+      attachPaginationHeaders(res, page.meta);
+      return res.json({ feed: page.items, pagination: page.meta });
+    }
+
     const cleanKey = sessionUser.replace(/^\//, '');
     const slashKey = sessionUser.startsWith('/') ? sessionUser : `/${sessionUser}`;
     
     const usersMap = loadUsers();
-    const messagesArray = loadMessages();
+    const messagesArray = loadMessages().filter(msg => msg?.moderationStatus !== "hidden");
     
     const currentUser = usersMap[slashKey] || usersMap[cleanKey] || {};
     const following = new Set(currentUser.following || []);
-    
-    // Get user's topic preferences
-    const userPrefs = userTopicCache.get(sessionUser) || { topics: {}, totalWeight: 0 };
-    
-    // Calculate topic preference percentages
-    const topicPreferences = {};
-    if (userPrefs.totalWeight > 0) {
-      for (const [topic, weight] of Object.entries(userPrefs.topics)) {
-        topicPreferences[topic] = (weight / userPrefs.totalWeight) * 100;
-      }
-    }
-    
-    // Get posts to score (last 7 days + followed users + own posts)
-    const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+
+    const replyCounts = new Map();
+    const quoteCounts = new Map();
+    messagesArray.forEach(msg => {
+      if (msg.parentId) replyCounts.set(msg.parentId, (replyCounts.get(msg.parentId) || 0) + 1);
+      if (msg.isQuote && msg.quoteOf) quoteCounts.set(msg.quoteOf, (quoteCounts.get(msg.quoteOf) || 0) + 1);
+    });
+
+    // Get posts to score (last 14 days + followed users + own posts)
+    const twoWeeksAgo = Date.now() - (14 * 24 * 60 * 60 * 1000);
     let postsToScore = messagesArray.filter(msg => 
       msg && !msg.parentId && 
-      (msg.timestamp > oneWeekAgo || following.has(msg.username) || msg.username === sessionUser)
+      (msg.timestamp > twoWeeksAgo || following.has(msg.username) || msg.username === sessionUser)
     );
     
-    // Limit to 500 posts for performance
     if (postsToScore.length > 500) {
-      postsToScore = postsToScore.slice(0, 500);
+      postsToScore = postsToScore
+        .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0))
+        .slice(0, 500);
     }
-    
+
     // Analyze unanalyzed posts (batch in background)
     const unanalyzedPosts = postsToScore.filter(msg => !aiAnalysisCache.has(msg.id) && msg.message && msg.message.length > 10);
-    
-    // Analyze in background (don't await)
     if (unanalyzedPosts.length > 0) {
       unanalyzedPosts.slice(0, 5).forEach(post => {
         analyzePostContent(post.id, post.message);
       });
     }
-    
-    // Score each post
-    const now = Date.now();
-    const HOUR_MS = 1000 * 60 * 60;
-    
-    const scoredPosts = postsToScore.map(msg => {
-      const author = msg.username;
-      const isFollowing = following.has(author);
-      const isOwnPost = author === sessionUser;
-      
-      // Get analysis (use cached or generate on the fly)
-      let analysis = aiAnalysisCache.get(msg.id)?.data;
-      if (!analysis) {
-        analysis = extractTopicsFromText(msg.message);
+
+    const hydratedPosts = postsToScore.map(msg => {
+      let quotedPost = null;
+      if (msg.isQuote && msg.quoteOf) {
+        const originalQuotePost = messagesArray.find(m => m.id === msg.quoteOf);
+        if (originalQuotePost) {
+          quotedPost = {
+            id: originalQuotePost.id,
+            username: originalQuotePost.username,
+            message: originalQuotePost.message,
+            imageUrl: originalQuotePost.imageUrl,
+            isVideo: originalQuotePost.isVideo || false,
+            timestamp: originalQuotePost.timestamp,
+            pfp: usersMap[originalQuotePost.username]?.pfp || originalQuotePost.pfp || null
+          };
+        }
       }
-      
-      const postTopics = analysis.topics || ['general'];
-      
-      // Calculate topic match score (0-100)
-      let topicMatchScore = 0;
-      if (Object.keys(topicPreferences).length > 0) {
-        let totalScore = 0;
-        postTopics.forEach(topic => {
-          totalScore += topicPreferences[topic] || 0;
-        });
-        topicMatchScore = Math.min(100, totalScore / postTopics.length);
-      } else {
-        // New user - show diverse content
-        topicMatchScore = 50;
-      }
-      
-      // Calculate engagement score
-      const likesCount = (msg.likes || []).length;
-      const retweetsCount = (msg.retweets || []).length;
-      const savesCount = (msg.saves || []).length;
-      const repliesCount = messagesArray.filter(m => m.parentId === msg.id).length;
-      
-      const engagementScore = Math.min(50, 
-        (likesCount * 1) + (retweetsCount * 3) + (savesCount * 2) + (repliesCount * 1.5)
-      );
-      
-      // Calculate recency score
-      const postAge = now - msg.timestamp;
-      let recencyScore = 100;
-      if (postAge < HOUR_MS) recencyScore = 100;
-      else if (postAge < 6 * HOUR_MS) recencyScore = 80;
-      else if (postAge < 24 * HOUR_MS) recencyScore = 60;
-      else if (postAge < 3 * 24 * HOUR_MS) recencyScore = 40;
-      else if (postAge < 7 * 24 * HOUR_MS) recencyScore = 20;
-      else recencyScore = 5;
-      
-      // Energy boost
-      const energyBoost = (analysis.energy || 5) / 10;
-      
-      // Sentiment adjustment
-      const sentimentAdjustment = analysis.sentiment === 'negative' ? 0.8 : 1;
-      
-      // Following boost
-      const followingBoost = isFollowing ? 20 : 0;
-      
-      // Own post small boost
-      const ownPostBoost = isOwnPost ? 15 : 0;
-      
-      // FINAL SCORE - AI-powered!
-      const finalScore = 
-        (topicMatchScore * 0.35) +      // 35% - Topic match
-        (engagementScore * 0.20) +      // 20% - Engagement
-        (recencyScore * 0.15) +         // 15% - Recency
-        (energyBoost * 10) +            // 10% - Energy/Excitement
-        (followingBoost * 0.10) +       // 10% - Following
-        (ownPostBoost * 0.05) +         // 5% - Own posts
-        (sentimentAdjustment * 5);       // 5% - Sentiment
-      
-      // Get PFP
-      let pfp = usersMap[author]?.pfp;
-      if (!pfp || pfp === 'undefined' || pfp === 'null') {
-        pfp = msg.pfp || null;
-      }
-      
+
       return {
+        ...msg,
         id: msg.id,
-        username: author,
-        pfp: pfp,
+        username: msg.username,
+        pfp: usersMap[msg.username]?.pfp || msg.pfp || null,
         message: msg.message || "",
         imageUrl: msg.imageUrl || null,
+        isVideo: msg.isVideo || false,
         timestamp: msg.timestamp,
         likes: msg.likes || [],
         retweets: msg.retweets || [],
         saves: msg.saves || [],
-        isPremium: usersMap[author]?.isPremium || false,
+        isQuote: msg.isQuote || false,
+        quoteOf: msg.quoteOf || null,
+        quotedPost,
+        quoteCount: quoteCounts.get(msg.id) || 0,
+        isPremium: usersMap[msg.username]?.isPremium || false,
         views: msg.views || 0,
-        replyCount: repliesCount,
-        _debug: {
-          topicMatch: Math.round(topicMatchScore),
-          engagement: Math.round(engagementScore),
-          recency: Math.round(recencyScore),
-          energy: analysis.energy,
-          sentiment: analysis.sentiment,
-          topics: postTopics.join(','),
-          total: Math.round(finalScore)
-        }
+        replyCount: replyCounts.get(msg.id) || 0
       };
     });
-    
-    // Sort by final score
-    scoredPosts.sort((a, b) => b._debug.total - a._debug.total);
-    
-    // Remove debug info
-    const cleanFeed = scoredPosts.map(post => {
-      const { _debug, ...cleanPost } = post;
-      return cleanPost;
+
+    const rankedFeed = feedRanking.rankDiscoveryFeed(hydratedPosts, {
+      currentUser: sessionUser,
+      following,
+      users: usersMap,
+      userPrefs: userTopicCache.get(sessionUser) || { topics: {}, totalWeight: 0 },
+      getReplyCount: postId => replyCounts.get(postId) || 0,
+      getAnalysis: post => aiAnalysisCache.get(post.id)?.data || extractTopicsFromText(post.message)
     });
+
+    const includeDebug = req.query.debugFeed === "true";
+    const cleanFeed = rankedFeed.map(post => feedRanking.stripRankDebug(post, includeDebug));
     
-    res.json({ feed: cleanFeed.slice(0, 50) });
+    const pagination = getPagination(req, { defaultLimit: 50, maxLimit: 100 });
+    const page = paginateArray(cleanFeed, pagination);
+    if (pagination.enabled) attachPaginationHeaders(res, page.meta);
+
+    res.json({
+      feed: page.items,
+      pagination: pagination.enabled ? page.meta : undefined
+    });
     
   } catch (err) {
     console.error("Discovery engine error:", err);
@@ -3639,10 +5284,21 @@ app.get("/api/feed/discovery", async (req, res) => {
   }
 });
 
-app.get("/api/feed/following", (req, res) => {
+app.get("/api/feed/following", api.asyncHandler(async (req, res) => {
   if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
   
   const sessionUser = req.session.username;
+
+  if (database.postgresRequested()) {
+    const page = await postgresStore.listFollowingFeed({
+      username: sessionUser,
+      limit: req.query.limit,
+      cursor: req.query.cursor
+    });
+    attachCursorHeaders(res, page.pagination);
+    return res.json(page.items);
+  }
+
   const users = loadUsers();
   const messages = loadMessages();
   const currentUser = users[sessionUser];
@@ -3652,11 +5308,18 @@ app.get("/api/feed/following", (req, res) => {
   const followingSet = new Set([...following, sessionUser]);
   
   const followingPosts = messages
-    .filter(msg => !msg.parentId && followingSet.has(msg.username))
+    .filter(msg => !msg.parentId && msg.moderationStatus !== "hidden" && followingSet.has(msg.username))
     .sort((a, b) => b.timestamp - a.timestamp);
-  
+
+  const pagination = getPagination(req, { defaultLimit: 50, maxLimit: 100 });
+  if (pagination.enabled) {
+    const page = paginateArray(followingPosts, pagination);
+    attachPaginationHeaders(res, page.meta);
+    return res.json(page.items);
+  }
+
   res.json(followingPosts);
-});
+}));
 
 // --- GET TRENDING TOPICS (for discovery page) ---
 app.get("/api/feed/trending", (req, res) => {
@@ -3672,6 +5335,12 @@ app.get("/api/feed/trending", (req, res) => {
     
     recentPosts.forEach(post => {
       if (!post.message) return;
+      const hashtags = Array.from(String(post.message).matchAll(/#([\w-]+)/g)).map(match => match[1].toLowerCase());
+      hashtags.forEach(tag => {
+        const totalEngagement = (post.likes?.length || 0) + (post.retweets?.length || 0) * 2 + (post.saves?.length || 0);
+        topicScores.set(`#${tag}`, (topicScores.get(`#${tag}`) || 0) + 2 + (totalEngagement / 8));
+      });
+
       const words = post.message.toLowerCase()
         .replace(/[^\w\s]/g, '')
         .split(/\s+/)
@@ -3926,6 +5595,8 @@ app.get("/api/ai/status", (req, res) => {
 
 const CYBERBITES_FILE = path.join(DATA_DIR, "cyberbites.json");
 const CYBERBITES_DIR = path.join(DATA_DIR, "cyberbites");
+const CYBERBITE_CAPTION_LIMIT = 150;
+const CYBERBITE_MAX_FILE_SIZE = 15 * 1024 * 1024;
 
 if (!fs.existsSync(CYBERBITES_DIR)) fs.mkdirSync(CYBERBITES_DIR, { recursive: true });
 
@@ -3992,6 +5663,16 @@ function getWeekNumber(date) {
 app.post("/api/cyberbites/upload", upload.single("video"), (req, res) => {
   if (!req.session.username) return res.status(401).json({ error: "Unauthorized" });
   if (!req.file) return res.status(400).json({ error: "No video uploaded" });
+
+  const caption = sanitizeHtml(req.body.caption || "", { allowedTags: [], allowedAttributes: {} }).trim();
+  if (caption.length > CYBERBITE_CAPTION_LIMIT) {
+    if (req.file.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    return res.status(400).json({ error: `Caption must be ${CYBERBITE_CAPTION_LIMIT} characters or less` });
+  }
+  if (req.file.size > CYBERBITE_MAX_FILE_SIZE) {
+    if (req.file.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    return res.status(400).json({ error: "CyberBites videos must be 15MB or smaller" });
+  }
   
   const users = loadUsers();
   const user = users[req.session.username];
@@ -4058,12 +5739,14 @@ app.post("/api/cyberbites/upload", upload.single("video"), (req, res) => {
     id: Date.now(),
     username: req.session.username,
     videoUrl: videoUrl,
-    caption: sanitizeHtml(req.body.caption || "", { allowedTags: [], allowedAttributes: {} }),
+    caption,
     timestamp: Date.now(),
     likes: [],
     saves: [],
     comments: [],
     views: 0,
+    fileSize: req.file.size,
+    originalName: sanitizeHtml(req.file.originalname || "", { allowedTags: [], allowedAttributes: {} }),
     pfp: user?.pfp || null,
     isPremium: isPremium,
     isAdmin: isAdmin
@@ -4096,13 +5779,26 @@ app.get("/api/cyberbites/feed", (req, res) => {
   const users = loadUsers();
   bites = bites.map(bite => ({
     ...bite,
-    isPremium: users[bite.username]?.isPremium || false
+    likes: Array.isArray(bite.likes) ? bite.likes : [],
+    saves: Array.isArray(bite.saves) ? bite.saves : [],
+    comments: Array.isArray(bite.comments) ? bite.comments : [],
+    views: Number.isFinite(bite.views) ? bite.views : 0,
+    fileSize: Number.isFinite(bite.fileSize) ? bite.fileSize : null,
+    isPremium: users[bite.username]?.isPremium || false,
+    pfp: bite.pfp || users[bite.username]?.pfp || null
   }));
   
   // Sort by newest first
   bites.sort((a, b) => b.timestamp - a.timestamp);
-  
-  res.json({ bites: bites.slice(0, 50) });
+
+  const pagination = getPagination(req, { defaultLimit: 50, maxLimit: 100 });
+  const page = paginateArray(bites, pagination);
+  if (pagination.enabled) attachPaginationHeaders(res, page.meta);
+
+  res.json({
+    bites: page.items,
+    pagination: pagination.enabled ? page.meta : undefined
+  });
 });
 
 // Like CyberBite
@@ -4189,24 +5885,55 @@ app.use('/cyberbites', express.static(path.join(__dirname, 'storage', 'cyberbite
   }
 }));
 
+app.use("/api", (req, res) => {
+  api.sendError(res, 404, "Endpoint not found");
+});
+
 app.use((err, req, res, next) => {
   if (err && err.code === "EBADCSRFTOKEN") {
-    return res.status(403).json({ error: "Invalid CSRF token" });
+    return api.sendError(res, 403, "Invalid CSRF token");
   }
   if (err instanceof multer.MulterError) {
-    return res.status(400).json({ error: err.message || "Upload failed" });
+    return api.sendError(res, 400, err.message || "Upload failed");
   }
   if (err && /upload|file type|file uploads|invalid file/i.test(err.message || "")) {
-    return res.status(400).json({ error: err.message });
+    return api.sendError(res, 400, err.message);
   }
-  next(err);
+
+  logError(`Unhandled request error ${req.method} ${req.originalUrl} (${req.id})`, err);
+  api.sendError(
+    res,
+    err.status || 500,
+    process.env.NODE_ENV === "production" ? "Internal server error" : (err.message || "Internal server error")
+  );
 });
 
 
 
 const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+const HOST = process.env.HOST || "0.0.0.0";
+const server = app.listen(PORT, HOST, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+    getLanUrls(PORT).forEach(url => console.log(`LAN access: ${url}`));
+});
+setupRealtime(server);
 server.on('error', (err) => err.code === 'EADDRINUSE' ? console.error(`Port ${PORT} in use.`) : console.error('Server error:', err));
+
+function shutdown(signal) {
+  console.log(`[SHUTDOWN] Received ${signal}. Closing server...`);
+  server.close(() => {
+    console.log("[SHUTDOWN] Server closed cleanly.");
+    database.closePool().finally(() => process.exit(0));
+  });
+
+  setTimeout(() => {
+    console.error("[SHUTDOWN] Forced exit after timeout.");
+    process.exit(1);
+  }, 10000).unref();
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
 // gpt-5-nano
 // gapgpt/z-image

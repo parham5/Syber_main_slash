@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="./index.css">
     <link rel="stylesheet" href="./pf.css">
     
+  <link rel="stylesheet" href="./ui-refactor.css">
+  <script src="./app-enhancements.js" defer></script>
 </head>
 <body>
   <div class="main-container">
@@ -119,20 +121,20 @@
 
             <!-- Stats Bar -->
             <div class="stats-bar">
-                <div class="stat-item-center">
-                    <span class="stat-value">1.2k</span>
+                <button class="stat-item-center stat-link" type="button" data-connection="followers">
+                    <span class="stat-value" data-stat="followers">0</span>
                     <span class="stat-label">Followers</span>
-                </div>
+                </button>
                 <div class="stat-divider"></div>
                 <div class="stat-item-center">
-                    <span class="stat-value">45</span>
+                    <span class="stat-value" data-stat="posts">0</span>
                     <span class="stat-label">Posts</span>
                 </div>
                 <div class="stat-divider"></div>
-                <div class="stat-item-center">
-                    <span class="stat-value">320</span>
+                <button class="stat-item-center stat-link" type="button" data-connection="following">
+                    <span class="stat-value" data-stat="following">0</span>
                     <span class="stat-label">Following</span>
-                </div>
+                </button>
             </div>
         </div>
 
@@ -149,17 +151,39 @@
             </div>
         </div>
 
+        <section class="profile-power-grid" aria-label="Profile overview">
+            <div class="profile-activity-card">
+                <div class="profile-section-kicker">Activity</div>
+                <div class="profile-activity-overview" id="profileActivityOverview"></div>
+            </div>
+            <div class="profile-feature-card" id="profilePinnedSection"></div>
+        </section>
+
+        <section class="profile-feature-card profile-highlights-section" id="profileHighlightsSection"></section>
+
         <!-- Filter Tabs -->
         <div class="filter-tabs">
-            <button class="tab-btn active" data-tab="slashes">
+            <button class="tab-btn active" data-tab="posts">
                 <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"></path></svg>
-                Slashes
+                Posts
+            </button>
+            <button class="tab-btn" data-tab="replies">
+                <svg viewBox="0 0 24 24"><path d="M14 9V5l7 7-7 7v-4H8c-2.76 0-5-2.24-5-5V7h2v3c0 1.66 1.34 3 3 3h6z"></path></svg>
+                Replies
+            </button>
+            <button class="tab-btn" data-tab="media">
+                <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 11.5l2.5 3.01L14.5 10l4.5 6H5l3.5-4.5z"></path></svg>
+                Media
+            </button>
+            <button class="tab-btn" data-tab="highlights">
+                <svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8-6.1-3.4-6.1 3.4 1.4-6.8-5.1-4.7 6.9-.8L12 2z"></path></svg>
+                Highlights
             </button>
             <button class="tab-btn" data-tab="likes">
                 <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
                 Likes
             </button>
-            <button class="tab-btn" data-tab="saved">
+            <button class="tab-btn" data-tab="saved" hidden>
                 <svg viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"></path></svg>
                 Saved
             </button>
@@ -167,77 +191,7 @@
 
         <!-- Results Grid -->
         <div class="results-grid">
-          
-          <!-- Post 1 -->
-          <div class="result-card post-card">
-            <div class="post-header">
-              <img src="./favicon.ico" alt="User" class="post-avatar">
-              <div>
-                <div class="post-author">Loading...</div>
-                <div class="post-time">2 hours ago</div>
-              </div>
-            </div>
-            <div class="post-content">
-              Loading
-            </div>
-            <div class="post-footer">
-              <div class="stat-item">
-                <svg viewBox="0 0 24 24"><path d="M21 11.01L3 11v2h18.01v-2zM21 7.01L3 7v2h18.01v-2zM21 15.01L3 15v2h18.01v-2z"></path></svg>
-                42
-              </div>
-              <div class="stat-item">
-                <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
-                204
-              </div>
-            </div>
-          </div>
-
-          <!-- Post 2 -->
-          <div class="result-card post-card">
-            <div class="post-header">
-              <img src="./favicon.ico" alt="User" class="post-avatar">
-              <div>
-                <div class="post-author">Loading...</div>
-                <div class="post-time">1 day ago</div>
-              </div>
-            </div>
-            <div class="post-content">
-              Loading...
-            </div>
-            <div class="post-footer">
-              <div class="stat-item">
-                <svg viewBox="0 0 24 24"><path d="M21 11.01L3 11v2h18.01v-2zM21 7.01L3 7v2h18.01v-2zM21 15.01L3 15v2h18.01v-2z"></path></svg>
-                18
-              </div>
-              <div class="stat-item">
-                <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 1 90"></path></svg>
-              </div>
-            </div>
-          </div>
-
-          <!-- Post 3 -->
-          <div class="result-card post-card">
-            <div class="post-header">
-              <img src="./favicon.ico" alt="User" class="post-avatar">
-              <div>
-                <div class="post-author">Loading...</div>
-                <div class="post-time">3 days ago</div>
-              </div>
-            </div>
-            <div class="post-content">
-              Loading...
-            </div>
-            <div class="post-footer">
-              <div class="stat-item">
-                <svg viewBox="0 0 24 24"><path d="M21 11.01L3 11v2h18.01v-2zM21 7.01L3 7v2h18.01v-2zM21 15.01L3 15v2h18.01v-2z"></path></svg>
-                85
-              </div>
-              <div class="stat-item">
-                <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
-                430
-              </div>
-            </div>
-          </div>
+          <div class="profile-empty-state">Loading profile...</div>
         </div>
       </div>
     </div>
@@ -341,6 +295,16 @@
         <p class="modal-bio-full" id="modalBioFull">
         Loading bio...
         </p>
+    </div>
+    </div>
+
+    <div class="modal-overlay" id="connectionsModal">
+    <div class="modal-content connections-modal-content">
+        <button class="modal-close" id="closeConnectionsModal">&times;</button>
+        <h2 class="modal-title" id="connectionsModalTitle">Connections</h2>
+        <div class="connections-list" id="connectionsList">
+            <div class="profile-empty-state">Loading...</div>
+        </div>
     </div>
     </div>
 

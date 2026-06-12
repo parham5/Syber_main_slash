@@ -1,2 +1,2 @@
 # CLASSIFIED
-this is between us and BlackBerry, do not tell anyone else.
+this is between me and you, do not tell anyone else.

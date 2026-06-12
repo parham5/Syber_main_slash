@@ -143,31 +143,53 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="/auth.css">
+  <link rel="stylesheet" href="./ui-refactor.css">
+  <script src="./app-enhancements.js" defer></script>
 </head>
-<body>
-  <div class="left-side">
-    <img alt="Cyberslash Logo" src = "Gemini_Generated_Image_tkdpcstkdpcstkdp.png">
-  </div>
-  <div class="right-side">
-    <img alt="Cyberslash Logo" src = "Gemini_Generated_Image_tkdpcstkdpcstkdp.png" class="logo">
-    <h1>Sign in to Cybers/ash</h1>
-    
-    <div id="errorMessage" class="error-message"></div>
-    
-    <div class="form-group">
-      <input type="text" id="loginUsername" placeholder="Username (Users: /user_X | Admins: /adminX)">
-    </div>
-    <div class="form-group">
-      <input type="password" id="loginPassword" placeholder="Password">
-    </div>
-    
-    <button class="login-btn" id="loginBtn" onclick="login()">Sign in</button>
-    <button class="forgot-btn" onclick="window.location.href='/forgot.html'">Forgot password?</button>
-    
-    <p class="signup-prompt">
-      Don't have an account? <a href="/signup.html">Sign up now!</a>
-    </p>
-  </div>
+<body class="auth-page">
+  <main class="auth-shell">
+    <section class="auth-brand" aria-label="Cyberslash overview">
+      <div class="auth-brand-mark">
+        <img alt="Cyberslash logo" src="/Gemini_Generated_Image_tkdpcstkdpcstkdp.png">
+        <span>cybers/ash</span>
+      </div>
+      <div class="auth-visual">
+        <img alt="Cyberslash visual mark" src="/Gemini_Generated_Image_tkdpcstkdpcstkdp.png">
+        <h1>Step back into the live feed.</h1>
+        <p>Fast posts, private messages, creator clips, and Nova in one focused social space.</p>
+      </div>
+      <p class="auth-footnote">Built for quick expression, anonymous-first profiles, and a cleaner social rhythm.</p>
+    </section>
+
+    <section class="auth-card-wrap" aria-label="Sign in">
+      <div class="auth-card">
+        <div class="auth-card-header">
+          <div>
+            <h1>Welcome back</h1>
+            <p>Sign in to continue to your feed.</p>
+          </div>
+          <img alt="Cyberslash logo" src="/Gemini_Generated_Image_tkdpcstkdpcstkdp.png" class="auth-card-logo">
+        </div>
+
+        <div id="errorMessage" class="error-message"></div>
+
+        <div class="form-group">
+          <input type="text" id="loginUsername" placeholder="Username" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password">
+        </div>
+
+        <button class="auth-primary-btn login-btn" id="loginBtn" onclick="login()">Sign in</button>
+        <button class="auth-secondary-btn forgot-btn" onclick="window.location.href='/forgot.html'">Forgot password?</button>
+
+        <p class="auth-switch signup-prompt">
+          Don't have an account? <a href="/signup.html">Create one</a>
+        </p>
+      </div>
+    </section>
+  </main>
 
   <script>
     // Check if already logged in

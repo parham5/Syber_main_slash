@@ -668,10 +668,51 @@ body {
 .search-input:focus + .search-icon {
   fill: var(--theme-accent);
 }
+.autocomplete-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  display: none;
+  z-index: 20;
+  overflow: hidden;
+  border: 1px solid var(--theme-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--theme-bg-secondary) 94%, #000 6%);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+}
+.autocomplete-panel.show {
+  display: block;
+}
+.suggestion-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--theme-border);
+  background: transparent;
+  color: var(--theme-text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+.suggestion-item:last-child {
+  border-bottom: 0;
+}
+.suggestion-item:hover {
+  background: var(--theme-bg-tertiary);
+}
+.suggestion-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+}
 .filter-tabs {
   display: flex;
   gap: 1rem;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
   border-bottom: 1px solid var(--theme-border);
   padding-bottom: 1rem;
 }
@@ -703,6 +744,67 @@ body {
   height: 18px;
   fill: currentColor;
 }
+.search-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin: -0.25rem 0 1rem;
+}
+.search-select {
+  min-height: 38px;
+  border: 1px solid var(--theme-border);
+  border-radius: 10px;
+  background: var(--theme-bg-secondary);
+  color: var(--theme-text-primary);
+  padding: 0 12px;
+}
+.explore-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 1.2rem;
+}
+.trend-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 0 8px;
+  scrollbar-width: thin;
+}
+.trend-chip {
+  border: 1px solid var(--theme-border);
+  background: var(--theme-bg-secondary);
+  color: var(--theme-text-primary);
+  border-radius: 999px;
+  padding: 8px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 0.84rem;
+  font-weight: 700;
+  transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+.trend-chip:hover,
+.trend-chip.active {
+  border-color: var(--theme-accent);
+  background: var(--theme-bg-tertiary);
+  transform: translateY(-1px);
+}
+.result-summary {
+  color: var(--theme-text-secondary);
+  font-size: 0.86rem;
+  white-space: nowrap;
+}
+.search-loading {
+  display: none;
+  color: var(--theme-text-secondary);
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+}
+.search-loading.show {
+  display: block;
+}
 .results-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -720,10 +822,25 @@ body {
   position: relative;
   overflow: hidden;
 }
+.result-card.clickable-card {
+  cursor: pointer;
+}
 .result-card:hover {
   transform: translateY(-5px);
   border-color: var(--theme-accent);
   background: rgba(255, 255, 255, 0.03);
+}
+.hashtag-card {
+  gap: 10px;
+}
+.hashtag-name {
+  color: var(--theme-text-primary);
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+.hashtag-meta {
+  color: var(--theme-text-secondary);
+  font-size: 0.9rem;
 }
 /* User Card Specifics */
 .user-card {
@@ -744,6 +861,7 @@ body {
   font-weight: 700;
   color: var(--theme-text-primary);
   margin-bottom: 0.2rem;
+  overflow-wrap: anywhere;
 }
 .user-handle {
   font-size: 0.85rem;
@@ -772,6 +890,7 @@ body {
   height: 32px;
   border-radius: 50%;
   background: var(--theme-bg-tertiary);
+  object-fit: cover;
 }
 .post-author {
   font-size: 0.9rem;
@@ -790,6 +909,21 @@ body {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+.post-media-preview {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--theme-border);
+  background: var(--theme-bg-tertiary);
+  margin-bottom: 1rem;
+}
+.result-highlight {
+  color: var(--theme-text-primary);
+  background: color-mix(in srgb, var(--theme-accent) 28%, transparent);
+  border-radius: 4px;
+  padding: 0 2px;
 }
 .post-footer {
   display: flex;
@@ -932,6 +1066,12 @@ body {
   }
   .results-grid { grid-template-columns: 1fr; }
   .filter-tabs { overflow-x: auto; padding-bottom: 0.5rem; }
+  .explore-strip {
+    grid-template-columns: 1fr;
+  }
+  .result-summary {
+    white-space: normal;
+  }
 }
 .mobile-navbar {
             display: none;
@@ -975,6 +1115,8 @@ body {
     }
 }
   </style>
+  <link rel="stylesheet" href="./ui-refactor.css">
+  <script src="./app-enhancements.js" defer></script>
 </head>
 <body>
   <div class="main-container">
@@ -1049,6 +1191,7 @@ body {
           <!-- Added ID: searchInput -->
           <input type="text" id="searchInput" class="search-input" placeholder="Search for users, slashes, or topics...">
           <svg class="search-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"></path></svg>
+          <div id="autocompletePanel" class="autocomplete-panel" role="listbox"></div>
         </div>
         <!-- Filter Tabs -->
         <div class="filter-tabs">
@@ -1064,7 +1207,23 @@ body {
             <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"></path></svg>
             Slashes
           </button>
+          <button class="tab-btn" data-filter="hashtags">
+            <svg viewBox="0 0 24 24"><path d="M10 3L8.7 8H4v2h4.18l-1 4H3v2h3.68L5.5 21h2.06l1.18-5h4.44L12 21h2.06l1.18-5H20v-2h-4.28l1-4H21V8h-3.78L18.5 3h-2.06l-1.28 5h-4.44L12 3h-2zm.22 7h4.44l-1 4H9.22l1-4z"></path></svg>
+            Hashtags
+          </button>
         </div>
+        <div class="search-controls">
+          <select id="sortSelect" class="search-select" aria-label="Sort search results">
+            <option value="top">Top</option>
+            <option value="latest">Latest</option>
+            <option value="people">People</option>
+          </select>
+        </div>
+        <div class="explore-strip">
+          <div id="trendChips" class="trend-chips" aria-label="Trending topics"></div>
+          <div id="resultSummary" class="result-summary">Loading discovery...</div>
+        </div>
+        <div id="searchLoading" class="search-loading">Searching...</div>
         <!-- Results Grid -->
         <!-- Added ID: resultsGrid -->
         <div class="results-grid" id="resultsGrid">
@@ -1131,7 +1290,7 @@ body {
       </div>
     </div>
   </div>
-<script>
+<script type="application/json" id="legacySearchScript">
   document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('searchInput');
     const resultsGrid = document.getElementById('resultsGrid');
@@ -1280,6 +1439,323 @@ body {
 
     // Initial Load: Trigger search with empty string to show top users
     performSearch("");
+  });
+</script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('searchInput');
+    const resultsGrid = document.getElementById('resultsGrid');
+    const emptyState = document.getElementById('emptyState');
+    const trendChips = document.getElementById('trendChips');
+    const resultSummary = document.getElementById('resultSummary');
+    const searchLoading = document.getElementById('searchLoading');
+    const autocompletePanel = document.getElementById('autocompletePanel');
+    const sortSelect = document.getElementById('sortSelect');
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    let currentFilter = 'all';
+    let searchTimeout = null;
+    let suggestTimeout = null;
+    let latestSearchId = 0;
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function escapeRegExp(value) {
+      return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function highlightText(value, query) {
+      const safeValue = escapeHtml(value);
+      const cleanQuery = String(query || '').replace(/^#/, '').trim();
+      if (!cleanQuery) return safeValue;
+      return safeValue.replace(new RegExp(`(${escapeRegExp(cleanQuery)})`, 'ig'), '<span class="result-highlight">$1</span>');
+    }
+
+    function setLoading(isLoading) {
+      if (searchLoading) searchLoading.classList.toggle('show', isLoading);
+    }
+
+    function updateUrlQuery(query) {
+      const url = new URL(window.location.href);
+      if (query) url.searchParams.set('q', query);
+      else url.searchParams.delete('q');
+      window.history.replaceState({}, '', url.toString());
+    }
+
+    function setSummary(users, posts, query) {
+      const hashtags = arguments[3] || [];
+      const total = (users?.length || 0) + (posts?.length || 0) + (hashtags?.length || 0);
+      if (!resultSummary) return;
+      if (!query) {
+        resultSummary.textContent = total ? `${total} explore picks` : 'Fresh explore picks';
+        return;
+      }
+      resultSummary.textContent = `${total} result${total === 1 ? '' : 's'} for "${query}"`;
+    }
+
+    function hideAutocomplete() {
+      if (autocompletePanel) {
+        autocompletePanel.classList.remove('show');
+        autocompletePanel.innerHTML = '';
+      }
+    }
+
+    async function loadAutocomplete(query) {
+      if (!autocompletePanel || query.length < 2) {
+        hideAutocomplete();
+        return;
+      }
+      try {
+        const response = await fetch(`/api/search/suggest?q=${encodeURIComponent(query)}`, { credentials: 'include' });
+        if (!response.ok) return hideAutocomplete();
+        const data = await response.json();
+        renderAutocomplete(data, query);
+      } catch (_) {
+        hideAutocomplete();
+      }
+    }
+
+    function renderAutocomplete(data, query) {
+      const items = [];
+      (data.users || []).slice(0, 3).forEach(user => {
+        items.push(`<button class="suggestion-item" data-value="${escapeHtml(user.username)}" type="button">
+          <img class="suggestion-avatar" src="${escapeHtml(user.pfp || './favicon.ico')}" onerror="this.src='./favicon.ico'" alt="">
+          <span>${highlightText(user.username, query)}</span>
+        </button>`);
+      });
+      (data.hashtags || []).slice(0, 4).forEach(item => {
+        items.push(`<button class="suggestion-item" data-value="${escapeHtml(item.tag)}" type="button">
+          <span class="hashtag-name" style="font-size:1rem">${escapeHtml(item.tag)}</span>
+          <span class="hashtag-meta">${Number(item.count || 0)} posts</span>
+        </button>`);
+      });
+      (data.posts || []).slice(0, 3).forEach(post => {
+        const preview = String(post.message || '').slice(0, 80);
+        items.push(`<button class="suggestion-item" data-value="${escapeHtml(preview)}" type="button">
+          <span>${highlightText(preview || post.username, query)}</span>
+        </button>`);
+      });
+      autocompletePanel.innerHTML = items.join('');
+      autocompletePanel.classList.toggle('show', items.length > 0);
+      autocompletePanel.querySelectorAll('.suggestion-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const value = item.dataset.value || '';
+          searchInput.value = value;
+          hideAutocomplete();
+          performSearch(value);
+        });
+      });
+    }
+
+    async function loadTrendingTopics() {
+      if (!trendChips) return;
+      try {
+        const response = await fetch('/api/feed/trending', { credentials: 'include' });
+        const data = await response.json();
+        const topics = Array.isArray(data.topics) ? data.topics.slice(0, 8) : [];
+        trendChips.innerHTML = '';
+        topics.forEach(topic => {
+          const word = String(topic.word || '').trim();
+          if (!word) return;
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'trend-chip';
+          chip.textContent = word.startsWith('#') ? word : `#${word}`;
+          chip.addEventListener('click', () => {
+            const query = chip.textContent;
+            searchInput.value = query;
+            currentFilter = 'all';
+            tabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.filter === 'all'));
+            performSearch(query);
+          });
+          trendChips.appendChild(chip);
+        });
+      } catch (error) {
+        trendChips.innerHTML = '';
+      }
+    }
+
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFilter = btn.dataset.filter || 'all';
+        performSearch(searchInput.value.trim());
+      });
+    });
+
+    searchInput.addEventListener('input', (event) => {
+      const query = event.target.value.trim();
+      if (searchTimeout) clearTimeout(searchTimeout);
+      if (suggestTimeout) clearTimeout(suggestTimeout);
+      suggestTimeout = setTimeout(() => loadAutocomplete(query), 140);
+      searchTimeout = setTimeout(() => performSearch(query), query ? 250 : 150);
+    });
+
+    searchInput.addEventListener('keypress', (event) => {
+      if (event.key === 'Enter') {
+        if (searchTimeout) clearTimeout(searchTimeout);
+        performSearch(searchInput.value.trim());
+        hideAutocomplete();
+      }
+    });
+
+    searchInput.addEventListener('blur', () => {
+      setTimeout(hideAutocomplete, 180);
+    });
+
+    if (sortSelect) {
+      sortSelect.addEventListener('change', () => performSearch(searchInput.value.trim()));
+    }
+
+    async function performSearch(query) {
+      const searchId = ++latestSearchId;
+      setLoading(true);
+      updateUrlQuery(query);
+      try {
+        const params = new URLSearchParams({
+          q: query,
+          type: currentFilter,
+          sort: sortSelect?.value || 'top',
+          limit: '60'
+        });
+        const response = await fetch(`/api/search?${params.toString()}`, { credentials: 'include' });
+        if (!response.ok) {
+          if (response.status === 401) {
+            window.location.href = '/login.html';
+            return;
+          }
+          throw new Error('Network response was not ok');
+        }
+        const data = await response.json();
+        if (searchId !== latestSearchId) return;
+        renderResults(data.users || [], data.posts || [], data.hashtags || [], query);
+      } catch (error) {
+        console.error('Search error:', error);
+        resultsGrid.innerHTML = '';
+        emptyState.style.display = 'block';
+        emptyState.innerHTML = '<p>Failed to load results. Please try again.</p>';
+      } finally {
+        if (searchId === latestSearchId) setLoading(false);
+      }
+    }
+
+    function renderResults(users, posts, hashtags, query) {
+      resultsGrid.innerHTML = '';
+      let hasResults = false;
+      const filteredUsers = currentFilter === 'users' ? users : (currentFilter === 'all' ? users : []);
+      const filteredPosts = currentFilter === 'slashes' ? posts : (currentFilter === 'all' ? posts : []);
+      const filteredHashtags = currentFilter === 'hashtags' ? hashtags : (currentFilter === 'all' ? hashtags : []);
+
+      filteredHashtags.forEach(item => {
+        hasResults = true;
+        const card = document.createElement('div');
+        card.className = 'result-card hashtag-card clickable-card';
+        card.innerHTML = `
+          <div class="hashtag-name">${escapeHtml(item.tag || '#topic')}</div>
+          <div class="hashtag-meta">${Number(item.count || 0)} related slash${Number(item.count || 0) === 1 ? '' : 'es'}</div>
+          <div class="hashtag-meta">Score ${Number(item.score || 0)}</div>
+        `;
+        card.addEventListener('click', () => {
+          searchInput.value = item.tag || '';
+          currentFilter = 'all';
+          tabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.filter === 'all'));
+          performSearch(searchInput.value.trim());
+        });
+        resultsGrid.appendChild(card);
+      });
+
+      filteredUsers.forEach(user => {
+        hasResults = true;
+        const card = document.createElement('div');
+        card.className = 'result-card user-card clickable-card';
+        const pfpSrc = user.pfp ? user.pfp : './favicon.ico';
+        card.innerHTML = `
+          <img src="${escapeHtml(pfpSrc)}" alt="User" class="user-avatar" onerror="this.src='./favicon.ico'">
+          <div class="user-info">
+            <div class="user-name">${highlightText(user.username, query)} ${user.isPremium ? '<span class="premium-badge">/P</span>' : ''}</div>
+            <div class="user-handle">/${escapeHtml(String(user.username || '').replace('/', ''))}</div>
+            <div class="user-handle">${highlightText(user.about || 'No bio yet.', query)}</div>
+            <div class="user-stats">
+              <span>${Number(user.followers || 0)} Followers</span>
+              <span>-</span>
+              <span>${Number(user.postCount || 0)} Posts</span>
+            </div>
+          </div>
+          <a href="/pf.html?user=${encodeURIComponent(user.username)}" class="btn btn-primary">View Profile</a>
+        `;
+        card.addEventListener('click', (event) => {
+          if (event.target.closest('a, button')) return;
+          window.location.href = `/pf.html?user=${encodeURIComponent(user.username)}`;
+        });
+        resultsGrid.appendChild(card);
+      });
+
+      filteredPosts.forEach(post => {
+        hasResults = true;
+        const card = document.createElement('div');
+        card.className = 'result-card post-card clickable-card';
+        const date = new Date(post.timestamp);
+        const timeString = date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        const pfpSrc = post.pfp ? post.pfp : './favicon.ico';
+        const mediaHtml = post.imageUrl
+          ? (post.isVideo
+            ? `<video class="post-media-preview" src="${escapeHtml(post.imageUrl)}" muted playsinline preload="metadata"></video>`
+            : `<img class="post-media-preview" src="${escapeHtml(post.imageUrl)}" alt="Post media" onerror="this.remove()">`)
+          : '';
+
+        card.innerHTML = `
+          <div class="post-header">
+            <img src="${escapeHtml(pfpSrc)}" alt="User" class="post-avatar" onerror="this.src='./favicon.ico'">
+            <div>
+              <div class="post-author">${highlightText(post.username, query)} ${post.isPremium ? '<span class="premium-badge">/P</span>' : ''}</div>
+              <div class="post-time">${timeString}</div>
+            </div>
+          </div>
+          ${mediaHtml}
+          <div class="post-content">${highlightText(post.message, query)}</div>
+          <div class="post-footer">
+            <div class="stat-item">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M21 11.01L3 11v2h18.01v-2zM21 7.01L3 7v2h18.01v-2zM21 15.01L3 15v2h18.01v-2z"></path></svg>
+              ${Number(post.retweets || 0)}
+            </div>
+            <div class="stat-item">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
+              ${Number(post.likes || 0)}
+            </div>
+            <div class="stat-item">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M21 6h-2v9H7v2c0 .55.45 1 1 1h10l4 4V7c0-.55-.45-1-1-1zM17 12V3c0-.55-.45-1-1-1H3c-.55 0-1 .45-1 1v14l4-4h10c.55 0 1-.45 1-1z"></path></svg>
+              ${Number(post.replyCount || 0)}
+            </div>
+          </div>
+        `;
+        card.addEventListener('click', () => {
+          if (post.id) window.location.href = `/post.html?id=${encodeURIComponent(post.id)}`;
+        });
+        resultsGrid.appendChild(card);
+      });
+
+      setSummary(filteredUsers, filteredPosts, query, filteredHashtags);
+
+      if (hasResults) {
+        emptyState.style.display = 'none';
+        emptyState.innerHTML = '';
+      } else {
+        emptyState.style.display = 'block';
+        emptyState.innerHTML = `<p>No results found for "${escapeHtml(searchInput.value)}"</p>`;
+      }
+    }
+
+    const initialQuery = new URLSearchParams(window.location.search).get('q') || '';
+    searchInput.value = initialQuery;
+    loadTrendingTopics();
+    performSearch(initialQuery);
   });
 </script>
 </body>

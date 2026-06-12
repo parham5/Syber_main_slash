@@ -244,8 +244,101 @@
         }
         .status-open { background: rgba(66, 153, 225, 0.2); color: #4299e1; }
         .status-in_progress { background: rgba(237, 137, 54, 0.2); color: #ed8936; }
+        .status-reviewing { background: rgba(237, 137, 54, 0.2); color: #ed8936; }
         .status-resolved { background: rgba(72, 187, 120, 0.2); color: #48bb78; }
+        .status-dismissed { background: rgba(113, 128, 150, 0.2); color: #a0aec0; }
         .status-closed { background: rgba(113, 128, 150, 0.2); color: #718296; }
+
+        .moderation-panel {
+            margin-top: 34px;
+            padding-top: 26px;
+            border-top: 1px solid var(--theme-border);
+        }
+
+        .moderation-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .moderation-header h2 {
+            margin: 0 0 6px;
+            color: var(--theme-text-primary);
+        }
+
+        .moderation-header p {
+            margin: 0;
+            color: var(--theme-text-secondary);
+            line-height: 1.45;
+        }
+
+        .moderation-stats {
+            margin-bottom: 18px;
+        }
+
+        .moderation-row td {
+            vertical-align: top;
+        }
+
+        .report-date,
+        .report-details {
+            margin-top: 5px;
+            color: var(--theme-text-secondary);
+            font-size: 0.78rem;
+            line-height: 1.35;
+        }
+
+        .reason-spam { background: #ed8936; }
+        .reason-harassment,
+        .reason-hate,
+        .reason-violence { background: #e53e3e; }
+        .reason-misinformation { background: #805ad5; }
+        .reason-other { background: #718096; }
+
+        .moderation-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            min-width: 220px;
+        }
+
+        .moderation-actions button {
+            min-height: 30px;
+            padding: 0 9px;
+            border: 1px solid var(--theme-border);
+            border-radius: 8px;
+            background: var(--theme-bg-tertiary);
+            color: var(--theme-text-primary);
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+
+        .moderation-actions button:hover {
+            border-color: var(--theme-accent);
+        }
+
+        .moderation-actions button.danger {
+            color: #ff6b6b;
+            border-color: rgba(255, 107, 107, 0.35);
+        }
+
+        .moderation-refresh-btn {
+            min-height: 38px;
+            padding: 0 16px;
+            border: 1px solid var(--theme-border);
+            border-radius: 999px;
+            background: var(--theme-bg-tertiary);
+            color: var(--theme-text-primary);
+            cursor: pointer;
+            font-weight: 800;
+        }
+
+        .moderation-refresh-btn:hover {
+            border-color: var(--theme-accent);
+        }
 
         @media (max-width: 768px) {
             .admin-dashboard {

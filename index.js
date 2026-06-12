@@ -33,6 +33,75 @@ let currentUserFollowing = [];
 let allPosts = [];
 let isLoadingPosts = false;
 let userPremiumCache = new Map();
+let activeQuotePostId = null;
+let activeComposerPreviewUrl = null;
+const MEDIA_LIMITS = {
+  image: 5 * 1024 * 1024,
+  video: 15 * 1024 * 1024
+};
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes)) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let index = 0;
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index += 1;
+  }
+  return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
+function validateComposerMedia(file) {
+  if (!file) return { ok: true };
+  const isVideo = file.type.startsWith("video/");
+  const isImage = file.type.startsWith("image/");
+  if (!isImage && !isVideo) return { ok: false, message: "Only images and videos are supported." };
+  const limit = isVideo ? MEDIA_LIMITS.video : MEDIA_LIMITS.image;
+  if (file.size > limit) {
+    return { ok: false, message: `${isVideo ? "Video" : "Image"} must be under ${formatBytes(limit)}.` };
+  }
+  return { ok: true, type: isVideo ? "video" : "image", limit };
+}
+
+function updateMediaInsight(file, warning = "") {
+  const panel = document.getElementById("mediaMetaPanel");
+  const insight = document.getElementById("mediaInsight");
+  if (!panel || !insight) return;
+  if (!file) {
+    panel.hidden = true;
+    insight.textContent = "";
+    insight.classList.remove("warning");
+    return;
+  }
+  const validation = validateComposerMedia(file);
+  panel.hidden = false;
+  insight.textContent = warning || `${file.type.startsWith("video/") ? "Video" : "Image"} - ${formatBytes(file.size)} - limit ${formatBytes(validation.limit || MEDIA_LIMITS.image)}`;
+  insight.classList.toggle("warning", Boolean(warning) || !validation.ok);
+}
+
+async function loadCreatorGallery() {
+  const gallery = document.getElementById("creatorGallery");
+  if (!gallery) return;
+  try {
+    const response = await fetch("/api/media/gallery?limit=12", { credentials: "include" });
+    if (!response.ok) return;
+    const data = await response.json();
+    const assets = Array.isArray(data.assets) ? data.assets : [];
+    gallery.classList.toggle("show", assets.length > 0);
+    gallery.innerHTML = assets.map(asset => {
+      const url = escapeAttribute(asset.url || "");
+      const label = escapeAttribute(asset.altText || asset.caption || "Media");
+      return `<div class="creator-gallery-item" title="${escapeAttribute(asset.originalName || "")}">
+        ${asset.mediaType === "video"
+          ? `<video src="${url}" muted playsinline preload="metadata" aria-label="${label}"></video>`
+          : `<img src="${url}" alt="${label}" onerror="this.parentElement.remove()">`}
+      </div>`;
+    }).join("");
+  } catch (err) {
+    gallery.classList.remove("show");
+  }
+}
 
 // Variables for 2FA flow
 let pendingSignupData = null;
@@ -43,33 +112,44 @@ let pendingForgotPasswordUsername = null;
 // ==========================================
 
 function handleImagePreview(input) {
-  console.log('handleImagePreview called');
-  console.log('Input:', input);
-  console.log('Files:', input.files);
-  
   const file = input.files[0];
   const preview = document.getElementById('preview');
+  const videoPreview = document.getElementById('videoPreview');
   const previewContainer = document.getElementById('previewContainer');
   const fileNameDisplay = document.getElementById('fileName');
   
   if (!file) {
-    console.log('No file selected');
+    updateMediaInsight(null);
     return;
   }
+  const validation = validateComposerMedia(file);
+  if (!validation.ok) {
+    alert(validation.message);
+    input.value = "";
+    updateMediaInsight(null);
+    return;
+  }
+  updateMediaInsight(file);
   
-  console.log('File type:', file.type);
+  if (activeComposerPreviewUrl) {
+    URL.revokeObjectURL(activeComposerPreviewUrl);
+    activeComposerPreviewUrl = null;
+  }
   
   if (file.type.startsWith('image/')) {
     const reader = new FileReader();
     reader.onload = function(e) {
-      console.log('Reader loaded, setting preview src');
       if (preview) {
         preview.src = e.target.result;
-        console.log('Preview src:', e.target.result.substring(0, 50) + '...');
+        preview.style.display = 'block';
+      }
+      if (videoPreview) {
+        videoPreview.removeAttribute('src');
+        videoPreview.load();
+        videoPreview.style.display = 'none';
       }
       if (previewContainer) {
         previewContainer.style.display = 'block';
-        console.log('Preview container shown');
       }
       if (fileNameDisplay) {
         fileNameDisplay.textContent = file.name;
@@ -79,37 +159,67 @@ function handleImagePreview(input) {
       console.error('Error reading file');
     };
     reader.readAsDataURL(file);
+  } else if (file.type.startsWith('video/')) {
+    activeComposerPreviewUrl = URL.createObjectURL(file);
+    if (preview) {
+      preview.src = '';
+      preview.style.display = 'none';
+    }
+    if (videoPreview) {
+      videoPreview.src = activeComposerPreviewUrl;
+      videoPreview.style.display = 'block';
+    }
+    if (previewContainer) {
+      previewContainer.style.display = 'block';
+    }
+    if (fileNameDisplay) {
+      fileNameDisplay.textContent = file.name;
+    }
   } else {
-    // Video file - hide preview
     if (preview) preview.src = '';
+    if (videoPreview) {
+      videoPreview.removeAttribute('src');
+      videoPreview.load();
+      videoPreview.style.display = 'none';
+    }
     if (previewContainer) previewContainer.style.display = 'none';
     if (fileNameDisplay) fileNameDisplay.textContent = file.name;
   }
 }
 
-// Replace your removeImagePreview function with this:
 function removeImagePreview() {
-  console.log('removeImagePreview called');
-  
   // Main input area
   const preview = document.getElementById('preview');
+  const videoPreview = document.getElementById('videoPreview');
   const previewContainer = document.getElementById('previewContainer');
   const imageInput = document.getElementById('imageInput');
   const fileNameDisplay = document.getElementById('fileName');
   
+  if (activeComposerPreviewUrl) {
+    URL.revokeObjectURL(activeComposerPreviewUrl);
+    activeComposerPreviewUrl = null;
+  }
   if (preview) {
     preview.src = '';
-    console.log('Preview src cleared');
+    preview.style.display = 'block';
+  }
+  if (videoPreview) {
+    videoPreview.removeAttribute('src');
+    videoPreview.load();
+    videoPreview.style.display = 'none';
   }
   if (previewContainer) {
     previewContainer.style.display = 'none';
-    console.log('Preview container hidden');
   }
   if (imageInput) {
     imageInput.value = '';
-    console.log('File input cleared');
   }
   if (fileNameDisplay) fileNameDisplay.textContent = 'No media selected';
+  const captionInput = document.getElementById("mediaCaptionInput");
+  const altInput = document.getElementById("mediaAltInput");
+  if (captionInput) captionInput.value = "";
+  if (altInput) altInput.value = "";
+  updateMediaInsight(null);
   
   // Modal input area
   const modalImageInput = document.getElementById('postModalImageInput');
@@ -132,29 +242,17 @@ function removeImagePreview() {
 
 // Run immediately when script loads
 (function() {
-  console.log('Script initializing...');
-  
   const imageInput = document.getElementById('imageInput');
   const previewContainer = document.getElementById('previewContainer');
-  
-  console.log('imageInput element:', imageInput);
-  console.log('previewContainer element:', previewContainer);
-  
+
   if (imageInput) {
-    // Use both addEventListener and onchange as backup
     imageInput.onchange = function(e) {
-      console.log('onchange triggered');
       handleImagePreview(this);
     };
     
     imageInput.addEventListener('change', function(e) {
-      console.log('addEventListener change triggered');
       handleImagePreview(this);
     });
-    
-    console.log('Event listeners attached');
-  } else {
-    console.error('imageInput not found!');
   }
   
   // Initialize preview as hidden
@@ -162,6 +260,7 @@ function removeImagePreview() {
     previewContainer.style.display = 'none';
   }
   setupComposerEnhancements();
+  loadCreatorGallery();
 })();
 
 // Fetch CSRF token on load
@@ -211,7 +310,26 @@ document.addEventListener('DOMContentLoaded', function() {
     observePostVisibility();
   }, 2000);
   setupFeedTabs();
+  setupQuoteComposer();
 });
+
+function setupQuoteComposer() {
+  const quoteInput = document.getElementById("quoteModalInput");
+  const quoteCount = document.getElementById("quoteCharCount");
+  const quoteBtn = document.getElementById("quotePostBtn");
+
+  if (!quoteInput || !quoteCount || !quoteBtn) return;
+
+  quoteInput.addEventListener("input", () => {
+    const length = quoteInput.value.length;
+    quoteCount.textContent = `${length} / 280`;
+    quoteCount.classList.toggle("warning", length >= 240 && length < 270);
+    quoteCount.classList.toggle("danger", length >= 270);
+    quoteBtn.disabled = length === 0;
+  });
+
+  quoteBtn.disabled = true;
+}
 
 function handleScroll() {
   const fabBtn = document.getElementById("fabBtn");
@@ -872,6 +990,12 @@ function closePostModal() {
   document.getElementById("postModal").style.display = "none";
   document.getElementById("postModalInput").value = "";
   document.getElementById("postModalImageInput").value = null;
+  const fileName = document.getElementById("postModalFileName");
+  const progress = document.getElementById("postModalUploadProgress");
+  const progressFill = document.getElementById("postModalUploadProgressFill");
+  if (fileName) fileName.textContent = "No file chosen";
+  if (progress) progress.style.display = "none";
+  if (progressFill) progressFill.style.width = "0%";
 }
 
 function openEditModal(postId) {
@@ -932,6 +1056,108 @@ function openReplyModal(postId) {
 
 function closeReplyModal() {
   document.getElementById("replyModal").style.display = "none";
+}
+
+function openQuoteModal(postId) {
+  const originalPost = allPosts.find(p => String(p.id) === String(postId));
+  if (!originalPost) return;
+
+  activeQuotePostId = postId;
+  const quoteInput = document.getElementById("quoteModalInput");
+  const quoteCount = document.getElementById("quoteCharCount");
+  const preview = document.getElementById("quoteOriginalPost");
+
+  if (quoteInput) quoteInput.value = "";
+  if (quoteCount) quoteCount.textContent = "0 / 280";
+  if (preview) {
+    preview.innerHTML = renderQuotedPost({
+      id: originalPost.id,
+      username: originalPost.username,
+      message: originalPost.message,
+      imageUrl: originalPost.imageUrl,
+      isVideo: originalPost.isVideo || false,
+      timestamp: originalPost.timestamp,
+      pfp: originalPost.pfp
+    });
+  }
+
+  const quoteModal = document.getElementById("quoteModal");
+  if (quoteModal) quoteModal.style.display = "flex";
+}
+
+function closeQuoteModal() {
+  activeQuotePostId = null;
+  const quoteModal = document.getElementById("quoteModal");
+  const quoteInput = document.getElementById("quoteModalInput");
+  if (quoteModal) quoteModal.style.display = "none";
+  if (quoteInput) quoteInput.value = "";
+}
+
+function submitQuotePost() {
+  const quoteInput = document.getElementById("quoteModalInput");
+  const quoteBtn = document.getElementById("quotePostBtn");
+  const message = quoteInput ? quoteInput.value.trim() : "";
+
+  if (!activeQuotePostId || !message) {
+    alert("Add a short take before quoting.");
+    return;
+  }
+
+  if (quoteBtn) {
+    quoteBtn.disabled = true;
+    quoteBtn.textContent = "Quoting...";
+  }
+
+  csrfFetch(`/api/messages/quote/${activeQuotePostId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message })
+  })
+    .then(async res => {
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to quote post");
+      }
+      return res.json();
+    })
+    .then(savedQuote => {
+      savedQuote.isOwnPost = true;
+      allPosts.unshift(savedQuote);
+      const feed = document.getElementById("feed");
+      if (feed) {
+        const quoteElement = createPostElement(savedQuote, true);
+        feed.insertBefore(quoteElement, feed.firstChild);
+      }
+      const original = allPosts.find(p => String(p.id) === String(activeQuotePostId));
+      if (original) original.quoteCount = (original.quoteCount || 0) + 1;
+      closeQuoteModal();
+    })
+    .catch(err => alert(err.message))
+    .finally(() => {
+      if (quoteBtn) {
+        quoteBtn.disabled = false;
+        quoteBtn.textContent = "Quote";
+      }
+    });
+}
+
+function togglePinPost(postId) {
+  csrfFetch(`/api/messages/pin/${postId}`, { method: "POST" })
+    .then(async res => {
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to update pinned post");
+      }
+      return res.json();
+    })
+    .then(data => {
+      allPosts = allPosts.map(post => ({
+        ...post,
+        isPinned: data.pinnedPostId && String(post.id) === String(data.pinnedPostId)
+      }));
+      loadPosts();
+    })
+    .catch(err => alert(err.message));
 }
 
 function loadReplies(postId) {
@@ -1223,21 +1449,24 @@ function loadPosts() {
 function setupFeedTabs() {
   const forYouTab = document.getElementById("tab-for-you");
   const followingTab = document.getElementById("tab-following");
-  
-  if (forYouTab) {
-    forYouTab.addEventListener("click", () => {
-      currentFeedTab = "discovery";
-      forYouTab.classList.add("active");
-      followingTab.classList.remove("active");
-      loadAlgorithmicFeed();
-    });
+
+  function setActiveFeedTab(activeTab, inactiveTab) {
+    activeTab.classList.add("active");
+    activeTab.setAttribute("aria-selected", "true");
+    inactiveTab.classList.remove("active");
+    inactiveTab.setAttribute("aria-selected", "false");
   }
   
-  if (followingTab) {
+  if (forYouTab && followingTab) {
+    forYouTab.addEventListener("click", () => {
+      currentFeedTab = "discovery";
+      setActiveFeedTab(forYouTab, followingTab);
+      loadAlgorithmicFeed();
+    });
+
     followingTab.addEventListener("click", () => {
       currentFeedTab = "following";
-      followingTab.classList.add("active");
-      forYouTab.classList.remove("active");
+      setActiveFeedTab(followingTab, forYouTab);
       loadPosts(); // This should fetch posts from people you follow
     });
   }
@@ -1246,8 +1475,17 @@ function setupFeedTabs() {
 function postMessage() {
   const input = document.getElementById("postInput");
   const imageInput = document.getElementById("imageInput");
+  const captionInput = document.getElementById("mediaCaptionInput");
+  const altInput = document.getElementById("mediaAltInput");
   const message = input.value.trim();
   const selectedFile = imageInput.files[0] || null;
+  const mediaCaption = captionInput?.value?.trim() || "";
+  const mediaAlt = altInput?.value?.trim() || "";
+  const mediaValidation = validateComposerMedia(selectedFile);
+  if (!mediaValidation.ok) {
+    alert(mediaValidation.message);
+    return;
+  }
   
   if (!message && !selectedFile) {
     alert("You must enter a message or select an image.");
@@ -1262,7 +1500,10 @@ function postMessage() {
     message: message,
     timestamp: Date.now(),
     imageUrl: null,
-    isVideo: false,
+    isVideo: selectedFile ? selectedFile.type.startsWith("video/") : false,
+    mediaCaption,
+    mediaAlt,
+    mediaSize: selectedFile?.size || null,
     pfp: document.getElementById("accountPfp")?.src || "favicon.ico",
     parentId: null,
     likes: [],
@@ -1328,13 +1569,28 @@ function postMessage() {
   if (fileNameDisplay) fileNameDisplay.textContent = "No media selected";
   const previewContainer = document.getElementById("previewContainer");
   if (previewContainer) previewContainer.style.display = 'none';
+  if (captionInput) captionInput.value = "";
+  if (altInput) altInput.value = "";
+  updateMediaInsight(null);
   const preview = document.getElementById("preview");
   if (preview) preview.src = "";
+  const videoPreview = document.getElementById("videoPreview");
+  if (videoPreview) {
+    videoPreview.removeAttribute("src");
+    videoPreview.load();
+    videoPreview.style.display = "none";
+  }
+  if (activeComposerPreviewUrl) {
+    URL.revokeObjectURL(activeComposerPreviewUrl);
+    activeComposerPreviewUrl = null;
+  }
   if (window.updateComposerState) window.updateComposerState();
   
   // Actual upload to server
   const formData = new FormData();
   formData.append("message", message);
+  formData.append("caption", mediaCaption);
+  formData.append("altText", mediaAlt);
   if (selectedFile) {
     formData.append("image", selectedFile);
   }
@@ -1386,6 +1642,7 @@ function postMessage() {
           
           // Add to allPosts only AFTER server confirms
           allPosts.unshift(savedPost);
+          loadCreatorGallery();
         })
         .catch(err => {
           console.error("Error fetching user data:", err);
@@ -1394,6 +1651,7 @@ function postMessage() {
             const realPostElement = createPostElement(savedPost, true);
             optimisticElement.replaceWith(realPostElement);
           }
+          loadCreatorGallery();
         });
     } else {
       // Remove optimistic post on error
@@ -1443,10 +1701,14 @@ function loadProfilePosts(username) {
 }
 
 //event listener for the main file input
-document.getElementById('postModalImageInput').addEventListener('change', function(e) {
-  const fileName = e.target.files[0] ? e.target.files[0].name : 'No file chosen';
-  document.getElementById('postModalFileName').textContent = fileName;
-});
+const postModalImageInputElement = document.getElementById('postModalImageInput');
+if (postModalImageInputElement) {
+  postModalImageInputElement.addEventListener('change', function(e) {
+    const fileName = e.target.files[0] ? e.target.files[0].name : 'No file chosen';
+    const modalFileName = document.getElementById('postModalFileName');
+    if (modalFileName) modalFileName.textContent = fileName;
+  });
+}
 //FUNCTION FOR THE MODAL POSTING TOO:
 function postFromModal() {
   const input = document.getElementById("postModalInput");
@@ -1628,15 +1890,21 @@ function createPostElement(post, isOriginal = false) {
   let mediaHtml = '';
   if (post.imageUrl) {
     const isVideo = post.imageUrl.match(/\.(mp4|webm|ogg|mov|avi)$/i) || post.isVideo === true;
+    const mediaCaption = post.mediaCaption ? `<div class="media-caption">${escapeHtml(post.mediaCaption)}</div>` : "";
+    const mediaAlt = escapeAttribute(post.mediaAlt || post.mediaCaption || "Post media");
     mediaHtml = isVideo 
-      ? `<video src="${post.imageUrl}" controls preload="metadata" style="max-width: 100%; border-radius: 10px; margin-top: 10px;"></video>`
-      : `<img src="${post.imageUrl}" onclick="event.stopPropagation(); openImageViewer('${post.imageUrl}')" style="max-width: 100%; border-radius: 10px; margin-top: 10px; cursor: pointer;">`;
+      ? `<video src="${post.imageUrl}" controls preload="metadata" aria-label="${mediaAlt}" style="max-width: 100%; border-radius: 10px; margin-top: 10px;"></video>${mediaCaption}`
+      : `<img src="${post.imageUrl}" alt="${mediaAlt}" onclick="event.stopPropagation(); openImageViewer('${post.imageUrl}')" style="max-width: 100%; border-radius: 10px; margin-top: 10px; cursor: pointer;">${mediaCaption}`;
   }
 
-  // Escape message content to prevent XSS
-  const escapedMessage = post.message ? post.message.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+  const renderedMessage = renderPostText(post.message || '');
+  const quotedPostHtml = renderQuotedPost(post.quotedPost);
+  const pinnedHeader = post.isPinned ? `<div class="pinned-post-badge">Pinned Slash</div>` : '';
+  const safeMenuPostId = escapeJsString(post.id);
+  const safeMenuAuthor = escapeJsString(displayUsername);
 
   li.innerHTML = `
+    ${pinnedHeader}
     ${retweetHeader}
     <div class="slash-header">
       <img src="${displayPfp || 'favicon.ico'}" alt="User" class="slash-avatar" onclick="event.stopPropagation(); window.location.href='./pf.html?user=${encodeURIComponent(displayUsername)}'" style="cursor:pointer;">
@@ -1653,17 +1921,26 @@ function createPostElement(post, isOriginal = false) {
         <div class="slash-options post-menu-btn" onclick="this.nextElementSibling.classList.toggle('show')">•••</div>
         <div class="dropdown-menu">
           <a class="dropdown-item" onclick="event.stopPropagation(); executeShare('${post.id}')">Share Post</a>
+          <a class="dropdown-item" onclick="event.stopPropagation(); hidePostFromFeed('${safeMenuPostId}')">Hide this post</a>
+          ${isOwnPost && !post.parentId && !isRetweet ? `
+            <a class="dropdown-item" onclick="event.stopPropagation(); togglePinPost('${post.id}')">${post.isPinned ? 'Unpin from profile' : 'Pin to profile'}</a>
+          ` : ''}
           ${isOwnPost ? `
             <a class="dropdown-item" onclick="event.stopPropagation(); openEditModal('${post.id}')">Edit</a>
             <a class="dropdown-item delete-option" onclick="event.stopPropagation(); openDeleteConfirmModal('${post.id}')">Delete</a>
-          ` : ''}
+          ` : `
+            <a class="dropdown-item warning-option" onclick="event.stopPropagation(); reportPost('${safeMenuPostId}')">Report post</a>
+            <a class="dropdown-item" onclick="event.stopPropagation(); muteUserFromPost('${safeMenuAuthor}')">Mute ${escapeHtml(displayUsername)}</a>
+            <a class="dropdown-item danger-option" onclick="event.stopPropagation(); blockUserFromPost('${safeMenuAuthor}')">Block ${escapeHtml(displayUsername)}</a>
+          `}
         </div>
       </div>
     </div>
 
     <div class="slash-content">
-      <p class="message" style="margin-top:0;">${escapedMessage}</p>
+      <p class="message" style="margin-top:0;">${renderedMessage}</p>
       ${mediaHtml}
+      ${quotedPostHtml}
     </div>
 
     <div class="slash-footer">
@@ -1701,6 +1978,12 @@ function createPostElement(post, isOriginal = false) {
             <button class="action-btn ${isSaved}" onclick="event.stopPropagation(); savePost('${post.id}')">
               <svg viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"></path></svg>
               <span class="action-count">${post.saves ? post.saves.length : 0}</span>
+            </button>
+        </div>
+        <div class="action-group">
+            <button class="action-btn" onclick="event.stopPropagation(); openQuoteModal('${post.id}')">
+              <svg viewBox="0 0 24 24"><path d="M7 7h7v7H9v3H5V9c0-1.1.9-2 2-2zm10 0h2v7h-5v-4c0-1.66 1.34-3 3-3z"></path></svg>
+              <span class="action-count">${post.quoteCount || 0}</span>
             </button>
         </div>
         ` : ''}
@@ -1758,7 +2041,56 @@ function createPostElement(post, isOriginal = false) {
 // Helper function to escape HTML
 function escapeHtml(str) {
   if (!str) return '';
-  return str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeAttribute(str) {
+  return escapeHtml(str).replace(/`/g, '&#96;');
+}
+
+function escapeJsString(str) {
+  return String(str == null ? "" : str).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+function renderPostText(text) {
+  const escaped = escapeHtml(text);
+  return escaped
+    .replace(/(^|[\s])#([A-Za-z0-9_]{1,40})/g, (match, prefix, tag) => {
+      const href = `./search.html?q=${encodeURIComponent('#' + tag)}`;
+      return `${prefix}<a class="post-token-link hashtag-link" href="${href}" onclick="event.stopPropagation()">#${tag}</a>`;
+    })
+    .replace(/(^|[\s])@([A-Za-z0-9_]{1,40})/g, (match, prefix, name) => {
+      const username = `/${name}`;
+      const href = `./pf.html?user=${encodeURIComponent(username)}`;
+      return `${prefix}<a class="post-token-link mention-link" href="${href}" onclick="event.stopPropagation()">@${name}</a>`;
+    });
+}
+
+function renderQuotedPost(quotedPost) {
+  if (!quotedPost) return '';
+
+  const quoteMedia = quotedPost.imageUrl
+    ? (quotedPost.isVideo
+      ? `<video src="${escapeAttribute(quotedPost.imageUrl)}" preload="metadata"></video>`
+      : `<img src="${escapeAttribute(quotedPost.imageUrl)}" alt="Quoted post media">`)
+    : '';
+
+  return `
+    <div class="quoted-post-card" onclick="event.stopPropagation(); navigateToPost('${quotedPost.id}')">
+      <div class="quoted-post-header">
+        <img src="${escapeAttribute(quotedPost.pfp || 'favicon.ico')}" alt="" class="quoted-post-avatar">
+        <span>${escapeHtml(quotedPost.username)}</span>
+        <time>${new Date(quotedPost.timestamp).toLocaleDateString()}</time>
+      </div>
+      <div class="quoted-post-text">${renderPostText(quotedPost.message || '')}</div>
+      ${quoteMedia}
+    </div>
+  `;
 }
 
 function likePost(postId) {
@@ -2221,6 +2553,103 @@ function updateAllFollowButtons(username) {
   }
 }
 
+function removePostLocally(postId) {
+  const postElement = document.querySelector(`.post[data-post-id="${postId}"], .slash-card[data-post-id="${postId}"]`);
+  if (postElement) postElement.remove();
+  allPosts = allPosts.filter(post => String(post.id) !== String(postId));
+}
+
+function removeAuthorPostsLocally(username) {
+  document.querySelectorAll(".post, .slash-card").forEach(postElement => {
+    const author = postElement.querySelector(".slash-author-link")?.dataset?.username;
+    if (author === username) postElement.remove();
+  });
+  allPosts = allPosts.filter(post => post.username !== username && post.originalUsername !== username);
+}
+
+function hidePostFromFeed(postId) {
+  if (!currentSessionUsername) {
+    alert("You must be logged in to hide posts.");
+    return;
+  }
+
+  csrfFetch(`/api/safety/hide-post/${encodeURIComponent(postId)}`, { method: "POST" })
+    .then(async res => {
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to hide post");
+      }
+      removePostLocally(postId);
+    })
+    .catch(err => alert(err.message || "Failed to hide post"));
+}
+
+function reportPost(postId) {
+  if (!currentSessionUsername) {
+    alert("You must be logged in to report posts.");
+    return;
+  }
+
+  const reason = prompt("Why are you reporting this post? Use spam, harassment, hate, violence, misinformation, or other.", "spam");
+  if (reason === null) return;
+  const details = prompt("Optional: add a short note for moderation.", "") || "";
+
+  csrfFetch(`/api/safety/report-post/${encodeURIComponent(postId)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason, details })
+  })
+    .then(async res => {
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to report post");
+      }
+      return res.json();
+    })
+    .then(() => {
+      alert("Report sent. Thanks for helping keep the feed clean.");
+    })
+    .catch(err => alert(err.message || "Failed to report post"));
+}
+
+function muteUserFromPost(username) {
+  if (!currentSessionUsername) {
+    alert("You must be logged in to mute users.");
+    return;
+  }
+  if (!confirm(`Mute ${username}? Their posts will disappear from your feed.`)) return;
+
+  csrfFetch(`/api/safety/mute/${encodeURIComponent(username)}`, { method: "POST" })
+    .then(async res => {
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to mute user");
+      }
+      removeAuthorPostsLocally(username);
+    })
+    .catch(err => alert(err.message || "Failed to mute user"));
+}
+
+function blockUserFromPost(username) {
+  if (!currentSessionUsername) {
+    alert("You must be logged in to block users.");
+    return;
+  }
+  if (!confirm(`Block ${username}? You will unfollow each other and their posts will be hidden.`)) return;
+
+  csrfFetch(`/api/safety/block/${encodeURIComponent(username)}`, { method: "POST" })
+    .then(async res => {
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to block user");
+      }
+      currentUserFollowing = currentUserFollowing.filter(user => user !== username);
+      updateAllFollowButtons(username);
+      removeAuthorPostsLocally(username);
+    })
+    .catch(err => alert(err.message || "Failed to block user"));
+}
+
 function openProfilePageModal(username) {
   const followBtn = document.getElementById("profileFollowBtn");
   const pfdmBtn = document.getElementById("pfDmBtn");
@@ -2394,10 +2823,16 @@ function hideProfileCard() {
 }
 
 // Update the file name display when a file is selected
-document.getElementById('imageInput').addEventListener('change', function(e) {
-  const fileName = e.target.files[0] ? e.target.files[0].name : 'No file chosen';
-  document.getElementById('fileName').textContent = fileName;
-});
+const imageInputFileNameElement = document.getElementById('imageInput');
+if (imageInputFileNameElement) {
+  imageInputFileNameElement.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file && !validateComposerMedia(file).ok) return;
+    const fileName = file ? file.name : 'No file chosen';
+    const fileNameElement = document.getElementById('fileName');
+    if (fileNameElement) fileNameElement.textContent = fileName;
+  });
+}
 // PFP file input change handler
 const pfpInputElement = document.getElementById('pfpInput');
 if (pfpInputElement) {
@@ -2448,6 +2883,23 @@ document.addEventListener("DOMContentLoaded", function() {
 // ==========================================
 let notifications = [];
 let notificationPollingInterval;
+let previousNotificationCount = 0;
+let lastNotificationId = null;
+let notificationFilter = "all";
+let notificationPreferences = {
+  notificationsEnabled: true,
+  mutedTypes: [],
+  mutedCategories: [],
+  soundEnabled: true,
+  showUnreadOnly: false
+};
+let notificationSocket = null;
+
+function escapeNotificationHtml(value) {
+  const div = document.createElement("div");
+  div.textContent = value == null ? "" : String(value);
+  return div.innerHTML;
+}
 
 function toggleNotifications() {
   const dropdown = document.getElementById("notificationDropdown");
@@ -2469,6 +2921,7 @@ function getSelectedRingtoneUrl() {
 }
 
 function playNotificationSound() {
+    if (notificationPreferences.soundEnabled === false) return;
     const audioUrl = getSelectedRingtoneUrl();
     const audio = new Audio(audioUrl);
     
@@ -2481,8 +2934,10 @@ function playNotificationSound() {
 function startNotificationPolling() {
   if (notificationPollingInterval) clearInterval(notificationPollingInterval);
   
+  loadNotificationPreferences();
   loadNotifications(); // Initial load
   previousNotificationCount = notifications.length; // Set initial count
+  initNotificationRealtime();
   
   notificationPollingInterval = setInterval(loadNotifications, 10000); // Poll every 10 seconds
 }
@@ -2495,10 +2950,14 @@ function stopNotificationPolling() {
 }
 
 function loadNotifications() {
-  fetch("/api/notifications", { credentials: "include" })
+  const params = new URLSearchParams({ limit: "50" });
+  if (notificationFilter === "unread" || notificationPreferences.showUnreadOnly) params.set("unread", "true");
+  if (notificationFilter !== "all" && notificationFilter !== "unread") params.set("type", notificationFilter);
+
+  fetch(`/api/notifications?${params.toString()}`, { credentials: "include" })
     .then(res => res.json())
     .then(data => {
-      const newNotifications = data;
+      const newNotifications = Array.isArray(data) ? data : [];
       
       // Check for new notifications
       // We compare the length or check if the latest ID is different
@@ -2524,7 +2983,26 @@ function loadNotifications() {
     .catch(err => console.error("Failed to load notifications:", err));
 }
 
-function renderNotifications() {
+function initNotificationRealtime() {
+  if (notificationSocket || typeof io !== "function") return;
+
+  notificationSocket = io({ withCredentials: true });
+  notificationSocket.on("notification:new", notification => {
+    if (!notification || notificationPreferences.notificationsEnabled === false) return;
+    const exists = notifications.some(item => String(item.id) === String(notification.id));
+    if (!exists) notifications.unshift(notification);
+    previousNotificationCount = notifications.length;
+    lastNotificationId = notification.id;
+    playNotificationSound();
+    renderNotifications();
+    updateNotificationBadge();
+  });
+  notificationSocket.on("connect", () => {
+    loadNotifications();
+  });
+}
+
+function legacyRenderNotifications() {
   const list = document.getElementById("notificationList");
   if (notifications.length === 0) {
     list.innerHTML = '<div class="notification-empty">No notifications yet</div>';
@@ -2560,6 +3038,69 @@ function renderNotifications() {
   }).join('');
 }
 
+function renderNotifications() {
+  const list = document.getElementById("notificationList");
+  if (!list) return;
+  if (notifications.length === 0) {
+    list.innerHTML = '<div class="notification-empty">No notifications yet</div>';
+    return;
+  }
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+  const categoryCounts = notifications.reduce((acc, n) => {
+    const key = n.category || "social";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const summaryHtml = `
+    <div class="notification-summary">
+      <span>${unreadCount} unread</span>
+      <span>${categoryCounts.conversation || 0} conversations</span>
+      <span>${categoryCounts.engagement || 0} engagements</span>
+      <button onclick="event.stopPropagation(); markNotificationCategoryRead('conversation')">Read conversations</button>
+      <button onclick="event.stopPropagation(); markNotificationCategoryRead('engagement')">Read engagements</button>
+    </div>
+  `;
+
+  const labels = {
+    reply: "Reply",
+    like: "Like",
+    retweet: "Re-Slash",
+    quote: "Quote",
+    follow: "Follow",
+    mention: "@"
+  };
+
+  const itemsHtml = notifications.map(n => {
+    const timeAgo = getTimeAgo(n.timestamp);
+    const unreadClass = n.read ? "" : "unread";
+    const pfpSrc = n.fromUserPfp || "favicon.ico";
+    const id = JSON.stringify(n.id);
+    const type = JSON.stringify(n.type || "");
+    const postId = n.postId == null ? "null" : JSON.stringify(n.postId);
+
+    return `
+      <div class="notification-item ${unreadClass}" onclick="handleNotificationClick(${id}, ${type}, ${postId})">
+        <img src="${escapeNotificationHtml(pfpSrc)}" alt="pfp" class="pfp" onerror="this.src='favicon.ico'">
+        <div class="notification-content">
+          <div class="notification-type">${escapeNotificationHtml(labels[n.type] || "Update")}</div>
+          <div class="notification-text">
+            <strong>${escapeNotificationHtml(n.fromUser || "Cybers/ash")}</strong> ${escapeNotificationHtml(n.message || "")}
+          </div>
+          <div class="notification-time">${timeAgo}</div>
+        </div>
+        <div class="notification-actions">
+          <button onclick="event.stopPropagation(); archiveNotification(${id})" aria-label="Archive notification">Archive</button>
+          <button onclick="event.stopPropagation(); muteNotificationType(${type})" aria-label="Mute notification type">Mute</button>
+          <button class="notification-delete" onclick="event.stopPropagation(); deleteNotification(${id})" aria-label="Delete notification">x</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  list.innerHTML = summaryHtml + itemsHtml;
+}
+
 function updateNotificationBadge() {
   const unreadCount = notifications.filter(n => !n.read).length;
   const badge = document.getElementById("notificationBadge");
@@ -2572,7 +3113,7 @@ function updateNotificationBadge() {
   }
 }
 
-function handleNotificationClick(notificationId, type, postId) {
+function legacyHandleNotificationClick(notificationId, type, postId) {
   // Mark as read
   markNotificationRead(notificationId);
   
@@ -2587,6 +3128,25 @@ function handleNotificationClick(notificationId, type, postId) {
     // Open the post
     closeNotificationDropdown();
     openReplyModal(postId);
+  }
+}
+
+function handleNotificationClick(notificationId, type, postId) {
+  markNotificationRead(notificationId);
+  const notification = notifications.find(n => String(n.id) === String(notificationId));
+
+  if (notification?.actionUrl) {
+    window.location.href = notification.actionUrl;
+    return;
+  }
+
+  if (type === "follow" && notification?.fromUser) {
+    window.location.href = `./pf.html?user=${encodeURIComponent(notification.fromUser)}`;
+    return;
+  }
+
+  if (postId) {
+    window.location.href = `./post.html?id=${encodeURIComponent(postId)}`;
   }
 }
 
@@ -2612,6 +3172,81 @@ function markAllNotificationsRead() {
   }).then(() => {
     loadNotifications();
   });
+}
+
+function setNotificationFilter(filter) {
+  notificationFilter = filter;
+  document.querySelectorAll(".notification-filter[data-filter]").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.filter === filter);
+  });
+  loadNotifications();
+}
+
+function markNotificationCategoryRead(category) {
+  fetch("/api/notifications/mark-category-read", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRF-Token": csrfToken
+    },
+    credentials: "include",
+    body: JSON.stringify({ category })
+  }).then(() => loadNotifications());
+}
+
+function archiveNotification(notificationId) {
+  fetch("/api/notifications/archive", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRF-Token": csrfToken
+    },
+    credentials: "include",
+    body: JSON.stringify({ notificationIds: [notificationId] })
+  }).then(() => loadNotifications());
+}
+
+function archiveReadNotifications() {
+  fetch("/api/notifications/archive-read", {
+    method: "POST",
+    headers: { "X-CSRF-Token": csrfToken },
+    credentials: "include"
+  }).then(() => loadNotifications());
+}
+
+function loadNotificationPreferences() {
+  fetch("/api/notifications/preferences", { credentials: "include" })
+    .then(res => res.ok ? res.json() : null)
+    .then(prefs => {
+      if (prefs) notificationPreferences = { ...notificationPreferences, ...prefs };
+    })
+    .catch(() => {});
+}
+
+function saveNotificationPreferences(nextPrefs) {
+  notificationPreferences = { ...notificationPreferences, ...nextPrefs };
+  return fetch("/api/notifications/preferences", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRF-Token": csrfToken
+    },
+    credentials: "include",
+    body: JSON.stringify(notificationPreferences)
+  }).then(res => res.ok ? res.json() : notificationPreferences)
+    .then(prefs => {
+      notificationPreferences = { ...notificationPreferences, ...prefs };
+      return notificationPreferences;
+    });
+}
+
+function muteNotificationType(type) {
+  if (!type) return;
+  const mutedTypes = new Set(notificationPreferences.mutedTypes || []);
+  mutedTypes.add(type);
+  saveNotificationPreferences({ mutedTypes: Array.from(mutedTypes) })
+    .then(() => loadNotifications())
+    .catch(() => alert("Failed to mute this notification type"));
 }
 
 function deleteNotification(notificationId) {
@@ -2649,23 +3284,34 @@ checkAuth = function() {
     })
     .then(user => {
       currentSessionUsername = user.username;
-      document.getElementById("accountUsername").textContent = user.username;
-      document.getElementById("accountPfp").src = user.pfp || "favicon.ico";
-      document.getElementById("oldaccountPfp").src = user.pfp || "favicon.ico";
-      document.getElementById("mobileaccountPfp").src = user.pfp || "favicon.ico";
-      document.getElementById("authModal").style.display = "none";
-      document.getElementById("fabBtn").style.display = "block";
-      document.getElementById("notificationBell").style.display = "flex";
+      const accountUsername = document.getElementById("accountUsername");
+      const accountPfp = document.getElementById("accountPfp");
+      const oldAccountPfp = document.getElementById("oldaccountPfp");
+      const mobileAccountPfp = document.getElementById("mobileaccountPfp");
+      const authModal = document.getElementById("authModal");
+      const fabBtn = document.getElementById("fabBtn");
+      const notificationBell = document.getElementById("notificationBell");
+      if (accountUsername) accountUsername.textContent = user.username;
+      if (accountPfp) accountPfp.src = user.pfp || "favicon.ico";
+      if (oldAccountPfp) oldAccountPfp.src = user.pfp || "favicon.ico";
+      if (mobileAccountPfp) mobileAccountPfp.src = user.pfp || "favicon.ico";
+      if (authModal) authModal.style.display = "none";
+      if (fabBtn) fabBtn.style.display = "block";
+      if (notificationBell) notificationBell.style.display = "flex";
       fetchUserFollowing();
       startNotificationPolling(); // START POLLING
       loadUserTheme(); // ADD THIS LINE - Load the user's theme/background
     })
     .catch(() => {
       currentSessionUsername = "";
-      document.getElementById("accountBtn").style.display = "none";
-      document.getElementById("authModal").style.display = "flex";
-      document.getElementById("fabBtn").style.display = "none";
-      document.getElementById("notificationBell").style.display = "none";
+      const accountBtn = document.getElementById("accountBtn");
+      const authModal = document.getElementById("authModal");
+      const fabBtn = document.getElementById("fabBtn");
+      const notificationBell = document.getElementById("notificationBell");
+      if (accountBtn) accountBtn.style.display = "none";
+      if (authModal) authModal.style.display = "flex";
+      if (fabBtn) fabBtn.style.display = "none";
+      if (notificationBell) notificationBell.style.display = "none";
       stopNotificationPolling(); // STOP POLLING
     });
 };
@@ -2675,7 +3321,7 @@ document.addEventListener("click", function(event) {
   const dropdown = document.getElementById("notificationDropdown");
   const bell = document.getElementById("notificationBell");
   
-  if (!dropdown.contains(event.target) && !bell.contains(event.target)) {
+  if (dropdown && bell && !dropdown.contains(event.target) && !bell.contains(event.target)) {
     closeNotificationDropdown();
   }
 });
@@ -2684,20 +3330,25 @@ document.addEventListener("click", function(event) {
 function openImageViewer(imageSrc) {
   const modal = document.getElementById("imageViewerModal");
   const img = document.getElementById("fullSizeImage");
+  if (!modal || !img) return;
   img.src = imageSrc;
   modal.style.display = "flex";
 }
 
 function closeImageViewer() {
-  document.getElementById("imageViewerModal").style.display = "none";
+  const modal = document.getElementById("imageViewerModal");
+  if (modal) modal.style.display = "none";
 }
 
 // Close image viewer when clicking outside the image
-document.getElementById("imageViewerModal").addEventListener("click", function(event) {
-  if (event.target === this) {
-    closeImageViewer();
-  }
-});
+const imageViewerModalElement = document.getElementById("imageViewerModal");
+if (imageViewerModalElement) {
+  imageViewerModalElement.addEventListener("click", function(event) {
+    if (event.target === this) {
+      closeImageViewer();
+    }
+  });
+}
 
 function checkTwoFactorStatus() {
   fetch(`/api/user-info/${encodeURIComponent(currentSessionUsername)}`, { credentials: "include" })
@@ -3112,7 +3763,9 @@ function renderFeedEmptyState(message, detail = "") {
 }
 
 // Make the badge clickable to switch tabs if on groups view
-document.getElementById('dm-badge').addEventListener('click', function(e) {
+const dmBadgeElement = document.getElementById('dm-badge');
+if (dmBadgeElement) {
+  dmBadgeElement.addEventListener('click', function(e) {
     e.stopPropagation();
     // If currently on groups tab, switch to DMs tab
     const groupsSection = document.getElementById('groupsSection');
@@ -3123,10 +3776,14 @@ document.getElementById('dm-badge').addEventListener('click', function(e) {
     const dmTabBtn = document.querySelector('.dm-tab.active') || document.querySelectorAll('.dm-tab')[0];
     // Ensure the active class is on the DM tab
     document.querySelectorAll('.dm-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.dm-tab')[0].classList.add('active');
-    document.getElementById('dmsSection').style.display = 'block';
-    document.getElementById('groupsSection').style.display = 'none';
-});
+    const firstDmTab = document.querySelectorAll('.dm-tab')[0];
+    const dmsSection = document.getElementById('dmsSection');
+    const groupsSectionPanel = document.getElementById('groupsSection');
+    if (firstDmTab) firstDmTab.classList.add('active');
+    if (dmsSection) dmsSection.style.display = 'block';
+    if (groupsSectionPanel) groupsSectionPanel.style.display = 'none';
+  });
+}
 
 // Global tracking for feed state
 let currentFeedTab = "discovery"; 

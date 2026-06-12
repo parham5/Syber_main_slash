@@ -295,6 +295,58 @@
       min-height: 80px;
     }
 
+    .cyberbite-upload-preview {
+      display: none;
+      grid-template-columns: 86px 1fr;
+      gap: 12px;
+      align-items: center;
+      background: var(--theme-bg-tertiary);
+      border: 1px solid var(--theme-border);
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    .cyberbite-upload-preview video {
+      width: 86px;
+      height: 116px;
+      border-radius: 10px;
+      object-fit: cover;
+      background: #000;
+    }
+
+    .cyberbite-upload-meta {
+      min-width: 0;
+      color: var(--theme-text-secondary);
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+
+    .cyberbite-upload-name {
+      color: var(--theme-text-primary);
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-bottom: 4px;
+    }
+
+    .cyberbite-caption-row {
+      display: flex;
+      justify-content: flex-end;
+      color: var(--theme-text-secondary);
+      font-size: 0.78rem;
+      margin: -4px 2px 10px;
+    }
+
+    .cyberbite-caption-row.warning {
+      color: #fbbf24;
+    }
+
+    .cyberbite-caption-row.danger {
+      color: #ef4444;
+    }
+
     .upload-limit-info {
       background: var(--theme-bg-tertiary);
       padding: 10px;
@@ -434,6 +486,8 @@
     }
 
   </style>
+  <link rel="stylesheet" href="./ui-refactor.css">
+  <script src="./app-enhancements.js" defer></script>
 </head>
 <body>
   <div class="cyberbites-container">
@@ -474,7 +528,15 @@
         Loading your upload limits...
       </div>
       <input type="file" id="cyberbiteVideo" accept="video/*" capture>
+      <div id="cyberbitePreviewCard" class="cyberbite-upload-preview">
+        <video id="cyberbitePreview" muted playsinline controls></video>
+        <div class="cyberbite-upload-meta">
+          <div id="cyberbiteFileName" class="cyberbite-upload-name">No video selected</div>
+          <div id="cyberbiteFileDetails">Choose a vertical video up to 60 seconds.</div>
+        </div>
+      </div>
       <textarea id="cyberbiteCaption" placeholder="Write a caption... (max 150 chars)" maxlength="150"></textarea>
+      <div id="cyberbiteCaptionCount" class="cyberbite-caption-row">0 / 150</div>
       <button class="upload-btn" onclick="uploadCyberBite()">Upload</button>
     </div>
   </div>
@@ -494,6 +556,10 @@
     let activeVideo = null;
     let totalVideos = 0;
     let feedElement = null;
+    let cyberbitePreviewUrl = null;
+    const CYBERBITE_MAX_DURATION = 60;
+    const CYBERBITE_MAX_FILE_SIZE = 15 * 1024 * 1024;
+    const CYBERBITE_CAPTION_LIMIT = 150;
 
     // Get CSRF token
     async function getCsrfToken() {
@@ -875,13 +941,114 @@
       }
     }
 
+    function formatBytes(bytes) {
+      if (!Number.isFinite(bytes)) return 'Unknown size';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      let size = bytes;
+      let unitIndex = 0;
+      while (size >= 1024 && unitIndex < units.length - 1) {
+        size /= 1024;
+        unitIndex++;
+      }
+      return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+    }
+
+    function resetCyberBitePreview() {
+      const previewCard = document.getElementById('cyberbitePreviewCard');
+      const preview = document.getElementById('cyberbitePreview');
+      const fileName = document.getElementById('cyberbiteFileName');
+      const fileDetails = document.getElementById('cyberbiteFileDetails');
+
+      if (cyberbitePreviewUrl) {
+        URL.revokeObjectURL(cyberbitePreviewUrl);
+        cyberbitePreviewUrl = null;
+      }
+      if (preview) {
+        preview.removeAttribute('src');
+        preview.load();
+      }
+      if (previewCard) previewCard.style.display = 'none';
+      if (fileName) fileName.textContent = 'No video selected';
+      if (fileDetails) fileDetails.textContent = 'Choose a vertical video up to 60 seconds.';
+    }
+
+    function updateCyberBiteCaptionCount() {
+      const caption = document.getElementById('cyberbiteCaption');
+      const counter = document.getElementById('cyberbiteCaptionCount');
+      if (!caption || !counter) return;
+
+      const count = caption.value.length;
+      counter.textContent = `${count} / ${CYBERBITE_CAPTION_LIMIT}`;
+      counter.classList.toggle('warning', count >= 120 && count < CYBERBITE_CAPTION_LIMIT);
+      counter.classList.toggle('danger', count >= CYBERBITE_CAPTION_LIMIT);
+    }
+
+    function updateCyberBitePreview() {
+      const videoInput = document.getElementById('cyberbiteVideo');
+      const previewCard = document.getElementById('cyberbitePreviewCard');
+      const preview = document.getElementById('cyberbitePreview');
+      const fileName = document.getElementById('cyberbiteFileName');
+      const fileDetails = document.getElementById('cyberbiteFileDetails');
+      const file = videoInput?.files?.[0];
+
+      resetCyberBitePreview();
+      if (!file) return;
+
+      if (!file.type.startsWith('video/')) {
+        alert('Please select a video file.');
+        videoInput.value = '';
+        return;
+      }
+
+      if (file.size > CYBERBITE_MAX_FILE_SIZE) {
+        alert('CyberBites videos must be 15MB or smaller.');
+        videoInput.value = '';
+        return;
+      }
+
+      cyberbitePreviewUrl = URL.createObjectURL(file);
+      if (preview) {
+        preview.src = cyberbitePreviewUrl;
+        preview.onloadedmetadata = () => {
+          const seconds = Math.round(preview.duration || 0);
+          if (seconds > CYBERBITE_MAX_DURATION) {
+            alert('Video must be 60 seconds or less for CyberBites!');
+            videoInput.value = '';
+            resetCyberBitePreview();
+            return;
+          }
+          if (fileDetails) {
+            fileDetails.textContent = `${formatBytes(file.size)} · ${seconds || '?'}s · ready to upload`;
+          }
+        };
+      }
+      if (previewCard) previewCard.style.display = 'grid';
+      if (fileName) fileName.textContent = file.name;
+      if (fileDetails) fileDetails.textContent = `${formatBytes(file.size)} · checking duration...`;
+    }
+
     async function uploadCyberBite() {
       const videoInput = document.getElementById('cyberbiteVideo');
-      const caption = document.getElementById('cyberbiteCaption').value;
+      const caption = document.getElementById('cyberbiteCaption').value.trim();
       const file = videoInput.files[0];
       
       if (!file) {
         alert('Please select a video file');
+        return;
+      }
+
+      if (!file.type.startsWith('video/')) {
+        alert('Please select a video file.');
+        return;
+      }
+
+      if (file.size > CYBERBITE_MAX_FILE_SIZE) {
+        alert('CyberBites videos must be 15MB or smaller.');
+        return;
+      }
+
+      if (caption.length > CYBERBITE_CAPTION_LIMIT) {
+        alert(`Caption must be ${CYBERBITE_CAPTION_LIMIT} characters or less.`);
         return;
       }
       
@@ -889,7 +1056,7 @@
       video.preload = 'metadata';
       video.onloadedmetadata = function() {
         window.URL.revokeObjectURL(video.src);
-        if (video.duration > 60) {
+        if (video.duration > CYBERBITE_MAX_DURATION) {
           alert('Video must be 60 seconds or less for CyberBites!');
           return;
         }
@@ -936,6 +1103,8 @@
           closeUploadModal();
           document.getElementById('cyberbiteVideo').value = '';
           document.getElementById('cyberbiteCaption').value = '';
+          resetCyberBitePreview();
+          updateCyberBiteCaptionCount();
           loadCyberBites();
           loadUploadLimits();
         } else {
@@ -953,10 +1122,12 @@
     function openUploadModal() {
       document.getElementById('uploadModal').classList.add('show');
       loadUploadLimits();
+      updateCyberBiteCaptionCount();
     }
 
     function closeUploadModal() {
       document.getElementById('uploadModal').classList.remove('show');
+      resetCyberBitePreview();
     }
 
     function showToast(message) {
@@ -1003,6 +1174,9 @@
       loadUploadLimits();
       
       document.getElementById('uploadShortBtn').onclick = openUploadModal;
+      document.getElementById('cyberbiteVideo')?.addEventListener('change', updateCyberBitePreview);
+      document.getElementById('cyberbiteCaption')?.addEventListener('input', updateCyberBiteCaptionCount);
+      updateCyberBiteCaptionCount();
       
       // Expose navigation functions globally
       window.navigateUp = navigateUp;

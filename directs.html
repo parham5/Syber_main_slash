@@ -7,6 +7,8 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./directs.css">
+  <link rel="stylesheet" href="./ui-refactor.css">
+  <script src="./app-enhancements.js" defer></script>
 </head>
 <body>
     <!-- APP LOCK OVERLAY -->
@@ -142,7 +144,14 @@
     
     <!-- Group List View -->
     <div class="chat-list-view" id="groupsSection" style="display: none;">
-        <div class="chat-list-view" id="groupList">
+        <div class="groups-toolbar">
+            <div>
+                <div class="groups-toolbar-title">Groups</div>
+                <div class="groups-toolbar-hint" id="groupCreateHint">Premium members can create group chats.</div>
+            </div>
+            <button id="createGroupBtn" class="create-group-btn" type="button" onclick="openCreateGroupModal()" style="display:none;">Create group</button>
+        </div>
+        <div id="groupList">
              <!-- Existing Groups will be rendered here -->
         </div>
     </div>
@@ -165,35 +174,45 @@
     <!-- Chat Interface (for DMs) -->
     <div id="chatInterfaceView" style="display:none;" class="chat-view">
         <div class="chat-header">
-        <button class="back-btn" onclick="window.location.href='./directs.html'">←</button>
+        <button class="back-btn" onclick="window.location.href='./directs.html'" aria-label="Back">←</button>
         <img id="chatHeaderPfp" src="" style="width:35px;height:35px;border-radius:50%;margin-right:12px;">
-        <h3 id="chatHeaderUsername" style="margin:0;color:white;flex:1;"></h3>
+            <div class="chat-header-main">
+                <h3 id="chatHeaderUsername" style="margin:0;color:white;"></h3>
+                <div id="dmTypingIndicator" class="typing-indicator" aria-live="polite"></div>
+                <input type="search" id="chatSearchInput" class="chat-search-input" placeholder="Search this chat..." autocomplete="off">
+                <div id="chatSearchStatus" class="chat-search-status" aria-live="polite"></div>
+            </div>
         <div class="chat-header-logo">
             cybers/ash
         </div>
         </div>
         <div id="chatMessages" class="chat-messages-area"></div>
         <div class="chat-input-area">
+            <div id="dmReplyPreview" class="dm-reply-preview" hidden></div>
             <div class="chat-input-wrapper">
                 <input type="text" id="dmInput" placeholder="Type a message...">
+                <label for="dmMediaInput" class="chat-attach-btn" title="Attach media">+</label>
+                <input type="file" id="dmMediaInput" accept="image/*,video/*">
                 <button id="dmSendBtn" onclick="sendDm()">Send</button>
             </div>
+            <div id="dmMediaName" class="chat-media-name"></div>
         </div>
     </div>
     
     <!-- Group Chat Interface -->
     <div id="groupChatInterfaceView" style="display:none;" class="chat-view">
         <div class="chat-header">
-            <button class="back-btn" onclick="window.location.href='./directs.html'">←</button>
+            <button class="back-btn" onclick="window.location.href='./directs.html'" aria-label="Back">←</button>
             <div class="group-header-info">
                 <div class="group-header-avatar" id="groupHeaderAvatar">G</div>
                 <div>
                     <h3 id="groupHeaderName" style="margin:0; color:white;"></h3>
                     <span id="groupMemberCount" style="color:#666; font-size:0.8rem;"></span>
                     <span id="groupOnlineCount" style="color:#4CAF50; font-size:0.8rem; margin-left:10px;"></span>
+                    <div id="groupTypingIndicator" class="typing-indicator" aria-live="polite"></div>
                 </div>
             </div>
-            <button class="group-settings-btn" onclick="openGroupSettings()">⚙️</button>
+            <button class="group-settings-btn" onclick="openGroupSettings()" aria-label="Group settings">⚙️</button>
         </div>
         <div id="groupChatMessages" class="chat-messages-area"></div>
         <div class="chat-input-area">
@@ -337,6 +356,7 @@
     </div>
 </div>
 
+<script src="/socket.io/socket.io.js"></script>
 <script src="directs.js"></script>
 <script src="./global-tracking.js"></script>
 </body>

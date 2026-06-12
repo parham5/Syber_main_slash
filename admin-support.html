@@ -9,6 +9,8 @@
     <link rel="stylesheet" href="./admin-support.css">
     
 
+  <link rel="stylesheet" href="./ui-refactor.css">
+  <script src="./app-enhancements.js" defer></script>
 </head>
 <body>
     <div class="container">
@@ -147,6 +149,62 @@
                     </tbody>
                 </table>
             </div>
+
+            <section class="moderation-panel">
+                <div class="moderation-header">
+                    <div>
+                        <h2>Moderation Queue</h2>
+                        <p>Review user reports and take action before harmful content spreads.</p>
+                    </div>
+                    <button class="moderation-refresh-btn" onclick="loadModerationReports()">Refresh</button>
+                </div>
+
+                <div class="stats-grid moderation-stats">
+                    <div class="stat-card">
+                        <div class="stat-number" id="modTotalReports">-</div>
+                        <div class="stat-label">Reports</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="modOpenReports">-</div>
+                        <div class="stat-label">Open</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="modReviewingReports">-</div>
+                        <div class="stat-label">Reviewing</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="modResolvedReports">-</div>
+                        <div class="stat-label">Resolved</div>
+                    </div>
+                </div>
+
+                <div class="ticket-filters moderation-filters">
+                    <button class="filter-btn mod-filter active" data-mod-filter="all">All Reports</button>
+                    <button class="filter-btn mod-filter" data-mod-filter="open">Open</button>
+                    <button class="filter-btn mod-filter" data-mod-filter="reviewing">Reviewing</button>
+                    <button class="filter-btn mod-filter" data-mod-filter="resolved">Resolved</button>
+                    <button class="filter-btn mod-filter" data-mod-filter="dismissed">Dismissed</button>
+                </div>
+
+                <div class="ticket-table moderation-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Report</th>
+                                <th>Reason</th>
+                                <th>Reporter</th>
+                                <th>Author</th>
+                                <th>Post</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="moderationTableBody">
+                            <tr><td colspan="7" style="text-align:center;">Loading reports...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
         </div>
         
         <p><i>© Cyberslash® LLC. 2026, All rights reserved.</i></p>

@@ -1,6 +1,8 @@
         let csrfToken = "";
         let allTickets = [];
         let currentFilter = "all";
+        let allModerationReports = [];
+        let currentModerationFilter = "all";
         
         // Gradient definitions (same as premium.html)
         const gradients = {
@@ -102,6 +104,8 @@
                 .then(() => {
                     loadStats();
                     loadAllTickets();
+                    loadModerationStats();
+                    loadModerationReports();
                 })
                 .catch(() => {
                     window.location.href = "./index.html";
@@ -234,9 +238,114 @@
                 viewTicket(ticketId);
             });
         }
+
+        function loadModerationStats() {
+            fetch("/api/moderation/stats", { credentials: "include" })
+                .then(res => res.json())
+                .then(stats => {
+                    document.getElementById("modTotalReports").textContent = stats.total || 0;
+                    document.getElementById("modOpenReports").textContent = stats.open || 0;
+                    document.getElementById("modReviewingReports").textContent = stats.reviewing || 0;
+                    document.getElementById("modResolvedReports").textContent = stats.resolved || 0;
+                })
+                .catch(() => {
+                    document.getElementById("moderationTableBody").innerHTML = '<tr><td colspan="7" style="text-align:center;">Could not load moderation stats</td></tr>';
+                });
+        }
+
+        function loadModerationReports() {
+            fetch("/api/moderation/reports", { credentials: "include" })
+                .then(res => res.json())
+                .then(reports => {
+                    allModerationReports = Array.isArray(reports) ? reports : [];
+                    filterModerationReports();
+                })
+                .catch(() => {
+                    document.getElementById("moderationTableBody").innerHTML = '<tr><td colspan="7" style="text-align:center;">Could not load reports</td></tr>';
+                });
+        }
+
+        function filterModerationReports() {
+            const reports = currentModerationFilter === "all"
+                ? allModerationReports
+                : allModerationReports.filter(report => (report.status || "open") === currentModerationFilter);
+            renderModerationReports(reports);
+        }
+
+        function renderModerationReports(reports) {
+            const tbody = document.getElementById("moderationTableBody");
+            if (!tbody) return;
+
+            if (reports.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No reports found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = reports.map(report => {
+                const status = report.status || "open";
+                const postText = report.post
+                    ? escapeHtml((report.post.message || "Media post").slice(0, 90))
+                    : "<em>Post unavailable</em>";
+                const details = report.details ? `<div class="report-details">${escapeHtml(report.details)}</div>` : "";
+
+                return `
+                    <tr class="moderation-row">
+                        <td>
+                            <strong>#${report.id}</strong>
+                            <div class="report-date">${formatDate(report.createdAt)}</div>
+                        </td>
+                        <td>
+                            <span class="priority-badge reason-${escapeHtml(report.reason || "other")}">${escapeHtml(report.reason || "other")}</span>
+                            ${details}
+                        </td>
+                        <td>${escapeHtml(report.reporter || "unknown")}</td>
+                        <td>${escapeHtml(report.author || "unknown")}</td>
+                        <td>${postText}</td>
+                        <td><span class="ticket-status status-${status}">${formatStatus(status)}</span></td>
+                        <td>
+                            <div class="moderation-actions">
+                                <button onclick="updateModerationReport(${report.id}, 'mark_reviewing')">Review</button>
+                                <button onclick="updateModerationReport(${report.id}, 'dismiss')">Dismiss</button>
+                                <button onclick="updateModerationReport(${report.id}, 'hide_post')">Hide</button>
+                                <button class="danger" onclick="updateModerationReport(${report.id}, 'delete_post')">Delete</button>
+                                <button class="danger" onclick="updateModerationReport(${report.id}, 'block_author')">Block Author</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join("");
+        }
+
+        function updateModerationReport(reportId, action) {
+            const destructive = action === "delete_post" || action === "block_author";
+            if (destructive && !confirm("This moderation action is destructive. Continue?")) return;
+            const note = prompt("Moderator note (optional):", "") || "";
+
+            fetch(`/api/moderation/reports/${reportId}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-Token": csrfToken
+                },
+                credentials: "include",
+                body: JSON.stringify({ action, note })
+            })
+                .then(async res => {
+                    if (!res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        throw new Error(data.error || "Moderation action failed");
+                    }
+                    return res.json();
+                })
+                .then(() => {
+                    loadModerationStats();
+                    loadModerationReports();
+                })
+                .catch(err => alert(err.message || "Moderation action failed"));
+        }
         
         function formatStatus(status) {
-            const map = { 'open': 'Open', 'in_progress': 'In Progress', 'resolved': 'Resolved', 'closed': 'Closed' };
+            const map = { 'open': 'Open', 'in_progress': 'In Progress', 'reviewing': 'Reviewing', 'resolved': 'Resolved', 'dismissed': 'Dismissed', 'closed': 'Closed' };
             return map[status] || status;
         }
         
@@ -254,12 +363,21 @@
             document.getElementById('ticketModal').style.display = 'none';
         }
         
-        document.querySelectorAll('.filter-btn').forEach(btn => {
+        document.querySelectorAll('.filter-btn:not(.mod-filter)').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.filter-btn:not(.mod-filter)').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 currentFilter = btn.dataset.filter;
                 filterTickets();
+            });
+        });
+
+        document.querySelectorAll('.mod-filter').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.mod-filter').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentModerationFilter = btn.dataset.modFilter || "all";
+                filterModerationReports();
             });
         });
         
